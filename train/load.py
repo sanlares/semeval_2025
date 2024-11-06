@@ -11,7 +11,7 @@ class LoadDataCSV:
 
     def __init__(self):
 
-        self.our_dataset_path = 'data/'
+        self.our_dataset_path = '../data/'
     
     def load_data(self):
 
