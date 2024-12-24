@@ -4,3 +4,12 @@ tformervenv/
 stella_en_400M_v5/
 __pycache__/
 .env
+runs/
+checkpoints/
+log/
+.vscode/
+*.pth
+*.bin
+*.pt
+*.pkl
+*.joblib
