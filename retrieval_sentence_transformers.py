@@ -1,3 +1,6 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Silencia advertencias de TensorFlow
+
 from sentence_transformers import SentenceTransformer, models, losses, InputExample, util
 from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
 from torch.utils.data import DataLoader, Dataset
@@ -6,7 +9,7 @@ import os
 import pandas as pd
 from typing import List, Dict, Set
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from transformers import AutoTokenizer
 import numpy as np
 from tqdm.auto import tqdm
@@ -20,6 +23,18 @@ logging.basicConfig(format='%(asctime)s - %(message)s',
                    datefmt='%Y-%m-%d %H:%M:%S',
                    level=logging.INFO)
 
+def check_cuda():
+    """Verify CUDA availability and print device info"""
+    if torch.cuda.is_available():
+        device = "cuda"
+        logging.info(f"CUDA available. Found {torch.cuda.device_count()} GPU(s):")
+        for i in range(torch.cuda.device_count()):
+            logging.info(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
+    else:
+        device = "cpu"
+        logging.info("CUDA not available. Using CPU.")
+    return device
+
 @dataclass
 class TrainingConfig:
     """Configuration for training the model."""
@@ -28,12 +43,13 @@ class TrainingConfig:
     max_seq_length: int = 512
     pooling_mode: str = "mean"  # Options: mean, max, cls
     embedding_dim: int = 128
-    batch_size: int = 4  # Further reduced batch size
-    gradient_accumulation_steps: int = 4  # Added gradient accumulation
+    batch_size: int = 16  # Aumentado ya que tienes suficiente memoria GPU
+    gradient_accumulation_steps: int = 2  # Reducido ya que aumentamos el batch_size
     num_epochs: int = 3
     temperature: float = 0.05
     learning_rate: float = 2e-5
     use_amp: bool = True  # Use automatic mixed precision
+    device: str = field(default_factory=check_cuda)  # Añadir device
     
     def __post_init__(self):
         """Create output directory if it doesn't exist."""
@@ -49,20 +65,24 @@ class FineTuneContrastiveDataset(Dataset):
         max_tokens: Maximum allowed length of texts.
         """
         self.pairs_data = pairs_data
-        self.posts = posts  # Already indexed by post_id
-        self.fact_checks = fact_checks  # Already indexed by fact_check_id
+        self.posts = posts
+        self.fact_checks = fact_checks
         self.tokenizer = tokenizer
         self.max_tokens = max_tokens
+        logging.info(f"Dataset initialized with {len(pairs_data)} pairs")
 
     def __len__(self):
         return len(self.pairs_data)
 
     def __getitem__(self, idx):
-        post_id, fact_check_id, label = self.pairs_data[idx]
-        post_text = str(self.posts.loc[post_id]["ocr_text"])
-        fact_check_text = str(self.fact_checks.loc[fact_check_id]["claim_title"])
-
-        return InputExample(texts=[post_text, fact_check_text], label=label)
+        try:
+            post_id, fact_check_id, label = self.pairs_data[idx]
+            post_text = str(self.posts.loc[post_id]["ocr_text"])
+            fact_check_text = str(self.fact_checks.loc[fact_check_id]["claim_title"])
+            return InputExample(texts=[post_text, fact_check_text], label=label)
+        except Exception as e:
+            logging.error(f"Error in __getitem__ at idx {idx}: {str(e)}")
+            raise
 
 class ImprovedE5Retrieval:
     """Improved E5 model for fact-checking retrieval using SentenceTransformers."""
@@ -70,16 +90,32 @@ class ImprovedE5Retrieval:
     def __init__(self, config: TrainingConfig):
         """Initialize the model with the given configuration."""
         self.config = config
+        # Asegurar que estamos usando el dispositivo correcto desde el inicio
+        self.device = torch.device(self.config.device)
         self.model = self._create_model()
+        # Mover el modelo al dispositivo correcto
+        self.model = self.model.to(self.device)
         self.train_loss = losses.MultipleNegativesRankingLoss(
             model=self.model,
             scale=1.0 / self.config.temperature,
             similarity_fct=self.custom_similarity
         )
+        self.last_pos_sim = None
+        self.last_neg_sim = None
     
     def custom_similarity(self, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         """Custom similarity function optimized for fact-checking retrieval."""
-        return util.cos_sim(a, b).float()
+        a = a.to(self.device)
+        b = b.to(self.device)
+        sim = util.cos_sim(a, b).float()
+        
+        # Guardar similitudes para logging
+        if a.size(0) == b.size(0):  # Son pares positivos
+            self.last_pos_sim = sim
+        else:  # Son pares negativos
+            self.last_neg_sim = sim
+        
+        return sim
     
     def _create_model(self) -> SentenceTransformer:
         """Create and configure the SentenceTransformer model."""
@@ -104,98 +140,56 @@ class ImprovedE5Retrieval:
         
         return SentenceTransformer(modules=[word_embedding_model, pooling_model, dense_model])
     
-    def train(self, train_dataset: FineTuneContrastiveDataset, val_dataset: FineTuneContrastiveDataset, pairs_val: pd.DataFrame, posts_val: pd.DataFrame, fact_checks_val: pd.DataFrame):
+    def train(self, train_dataset, val_dataset, pairs_val, posts_val, fact_checks_val):
         """Train the model using the provided datasets."""
+        logging.info(f"Training on device: {self.device}")
+        
+        # Verificar memoria GPU disponible
+        if torch.cuda.is_available():
+            logging.info(f"GPU Memory before training:")
+            logging.info(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+            logging.info(f"Cached: {torch.cuda.memory_reserved() / 1024**2:.2f} MB")
+        
+        # Configurar el DataLoader sin workers en paralelo por ahora
         train_dataloader = DataLoader(
             train_dataset,
             batch_size=self.config.batch_size,
-            shuffle=True
+            shuffle=True,
+            num_workers=0,  # Cambiado a 0 para evitar problemas de multiprocessing
+            pin_memory=True if torch.cuda.is_available() else False
         )
         
-        val_examples = [
-            InputExample(texts=[posts_val.loc[row['post_id'], 'ocr_text'], fact_checks_val.loc[row['fact_check_id'], 'claim_title']], label=1.0)
-            for _, row in pairs_val.iterrows()
-        ]
+        # Setup evaluator con ejemplos positivos y negativos
+        val_examples = []
+        
+        # Ejemplos positivos (pares correctos)
+        for _, row in pairs_val.iterrows():
+            val_examples.append(InputExample(
+                texts=[
+                    posts_val.loc[row['post_id'], 'ocr_text'],
+                    fact_checks_val.loc[row['fact_check_id'], 'claim_title']
+                ],
+                label=1.0
+            ))
+        
+        # Generar algunos ejemplos negativos
+        for _, row in pairs_val.iterrows():
+            # Seleccionar un fact check aleatorio diferente al correcto
+            wrong_fact_check_id = random.choice(list(set(fact_checks_val.index) - {row['fact_check_id']}))
+            val_examples.append(InputExample(
+                texts=[
+                    posts_val.loc[row['post_id'], 'ocr_text'],
+                    fact_checks_val.loc[wrong_fact_check_id, 'claim_title']
+                ],
+                label=0.0
+            ))
 
         evaluator = EmbeddingSimilarityEvaluator.from_input_examples(
             val_examples,
             name='fact-check-validation'
         )
         
-        warmup_steps = int(len(train_dataloader) * self.config.num_epochs * 0.1)
-        
-        self.model.gradient_checkpointing_enable()
-        
-        class EnhancedTensorBoardCallback:
-            def __init__(self, writer, model, batch_size):
-                self.writer = writer
-                self.model = model
-                self.step = 0
-                self.epoch = 0
-                self.batch_size = batch_size
-                self.training_start_time = time.time()
-                self.last_step_time = self.training_start_time
-                self.losses = []
-
-            def on_step_end(self, args, state, control):
-                if state.loss is not None:
-                    current_time = time.time()
-                    
-                    # Pérdida de entrenamiento
-                    self.writer.add_scalar('train/loss', state.loss, self.step)
-                    self.losses.append(state.loss)
-                    
-                    # Velocidad de entrenamiento
-                    step_time = current_time - self.last_step_time
-                    self.writer.add_scalar('train/samples_per_second', self.batch_size / step_time, self.step)
-                    
-                    # Learning rate actual
-                    if hasattr(self.model, 'optimizer') and hasattr(self.model.optimizer, 'param_groups'):
-                        lr = self.model.optimizer.param_groups[0]['lr']
-                        self.writer.add_scalar('train/learning_rate', lr, self.step)
-                    
-                    # Gradientes (norma L2)
-                    total_norm = 0.0
-                    for p in self.model.parameters():
-                        if p.grad is not None:
-                            param_norm = p.grad.data.norm(2)
-                            total_norm += param_norm.item() ** 2
-                    total_norm = total_norm ** 0.5
-                    self.writer.add_scalar('train/gradient_norm', total_norm, self.step)
-                    
-                    # Tiempo transcurrido
-                    elapsed_time = current_time - self.training_start_time
-                    self.writer.add_scalar('train/elapsed_minutes', elapsed_time / 60, self.step)
-                    
-                    self.last_step_time = current_time
-                    self.step += 1
-
-            def on_evaluate(self, args, state, control, metrics=None):
-                if metrics:
-                    # Métricas de evaluación
-                    for key, value in metrics.items():
-                        self.writer.add_scalar(f'eval/{key}', value, self.step)
-                    
-                    # Estadísticas de pérdida
-                    if self.losses:
-                        avg_loss = np.mean(self.losses)
-                        std_loss = np.std(self.losses)
-                        self.writer.add_scalar('train/avg_loss_epoch', avg_loss, self.epoch)
-                        self.writer.add_scalar('train/std_loss_epoch', std_loss, self.epoch)
-                        self.losses = []  # Reset para siguiente época
-                    
-                    self.epoch += 1
-
-            def on_train_end(self, args, state, control):
-                # Tiempo total de entrenamiento
-                total_time = time.time() - self.training_start_time
-                self.writer.add_text(
-                    'training_summary',
-                    f'Total training time: {total_time/60:.2f} minutes\n' +
-                    f'Total steps: {self.step}\n' +
-                    f'Average time per step: {total_time/self.step:.3f} seconds'
-                )
-
+        # Setup TensorBoard
         tb_writer = SummaryWriter(log_dir=os.path.join(self.config.output_path, 'logs'))
         tensorboard_callback = EnhancedTensorBoardCallback(
             tb_writer, 
@@ -203,6 +197,9 @@ class ImprovedE5Retrieval:
             self.config.batch_size
         )
 
+        # Training
+        warmup_steps = int(len(train_dataloader) * self.config.num_epochs * 0.1)
+        
         self.model.fit(
             train_objectives=[(train_dataloader, self.train_loss)],
             evaluator=evaluator,
@@ -219,12 +216,16 @@ class ImprovedE5Retrieval:
     
     def encode_batch(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
         """Encode texts in batches with optional caching."""
+        # Asegurar que el modelo está en el dispositivo correcto
+        self.model.to(self.device)
+        
         return self.model.encode(
             texts,
             batch_size=batch_size,
             show_progress_bar=True,
             convert_to_numpy=True,
-            normalize_embeddings=True
+            normalize_embeddings=True,
+            device=self.device
         )
     
     def save(self, path: str):
@@ -238,31 +239,28 @@ class ImprovedE5Retrieval:
         instance.model = SentenceTransformer(path)
         return instance
     
-    def split_train_val(self, posts_df: pd.DataFrame, fact_checks_df: pd.DataFrame, pairs_df: pd.DataFrame):
+    def split_train_val(self, posts_df, fact_checks_df, pairs_df):
+        """Split data into train and validation sets."""
         from sklearn.model_selection import train_test_split
-
-        # Create ids columns from index
+        
+        # Create copies to avoid SettingWithCopyWarning
+        posts_df = posts_df.copy()
+        fact_checks_df = fact_checks_df.copy()
+        
+        # Create ids columns
         posts_df["post_id"] = posts_df.index
         fact_checks_df["fact_check_id"] = fact_checks_df.index
-        pairs_df["post_id"] = pairs_df["post_id"].astype(int)
-        pairs_df["fact_check_id"] = pairs_df["fact_check_id"].astype(int)
-
+        
         # Split posts
         posts_train, posts_val = train_test_split(posts_df, test_size=0.2, random_state=42)
         
-        # Split pairs based on post_id
-        pairs_train = pairs_df[pairs_df['post_id'].isin(posts_train.index)]
-        pairs_val = pairs_df[pairs_df['post_id'].isin(posts_val.index)]
-
-        # Split fact checks based on pairs
-        fact_checks_train = fact_checks_df[fact_checks_df.index.isin(pairs_train['fact_check_id'])]
-        fact_checks_val = fact_checks_df[fact_checks_df.index.isin(pairs_val['fact_check_id'])]
+        # Split pairs
+        pairs_train = pairs_df[pairs_df['post_id'].isin(posts_train.index)].copy()
+        pairs_val = pairs_df[pairs_df['post_id'].isin(posts_val.index)].copy()
         
-        # Verify the presence of the new columns
-        logging.info(f"Columns in posts_train: {posts_train.columns}")
-        logging.info(f"Columns in fact_checks_train: {fact_checks_train.columns}")
-        logging.info(f"Columns in posts_val: {posts_val.columns}")
-        logging.info(f"Columns in fact_checks_val: {fact_checks_val.columns}")
+        # Split fact checks
+        fact_checks_train = fact_checks_df[fact_checks_df.index.isin(pairs_train['fact_check_id'])].copy()
+        fact_checks_val = fact_checks_df[fact_checks_df.index.isin(pairs_val['fact_check_id'])].copy()
         
         return posts_train, posts_val, fact_checks_train, fact_checks_val, pairs_train, pairs_val
 
@@ -287,10 +285,79 @@ def combine_claim_text(row):
     else:
         return ''
 
+def print_gpu_memory_usage():
+    """Print current GPU memory usage."""
+    if torch.cuda.is_available():
+        logging.info(f"GPU Memory Usage:")
+        logging.info(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+        logging.info(f"Cached: {torch.cuda.memory_reserved() / 1024**2:.2f} MB")
+
+def clear_gpu_memory():
+    """Clear unused GPU memory."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        logging.info("GPU memory cache cleared")
+
+class EnhancedTensorBoardCallback(TensorBoardCallback):
+    """Enhanced TensorBoard callback with additional metrics."""
+    
+    def __init__(self, tb_writer, model, batch_size):
+        super().__init__()
+        self.tb_writer = tb_writer
+        self.model = model
+        self.batch_size = batch_size
+        self.global_step = 0
+        self.prev_time = time.time()
+    
+    def __call__(self, score, epoch, steps):
+        """Called by SentenceTransformer when training"""
+        # Obtener loss actual (score es el negativo de la loss)
+        loss = -score
+        
+        # Métricas básicas de entrenamiento
+        self.tb_writer.add_scalar('Loss/train', loss, self.global_step)
+        
+        # Learning rate
+        if hasattr(self.model, 'optimizer'):
+            self.tb_writer.add_scalar('Learning Rate', 
+                                    self.model.optimizer.param_groups[0]['lr'], 
+                                    self.global_step)
+        
+        # Similitudes (si están disponibles en el modelo)
+        if hasattr(self.model, 'last_pos_sim') and hasattr(self.model, 'last_neg_sim'):
+            self.tb_writer.add_scalar('Similarity/positive', 
+                                    self.model.last_pos_sim.mean().item(), 
+                                    self.global_step)
+            self.tb_writer.add_scalar('Similarity/negative', 
+                                    self.model.last_neg_sim.mean().item(), 
+                                    self.global_step)
+        
+        # Norma del gradiente
+        if hasattr(self.model, 'model'):
+            total_norm = torch.nn.utils.clip_grad_norm_(self.model.model.parameters(), max_norm=1.0)
+            self.tb_writer.add_scalar('Gradients/total_norm', total_norm, self.global_step)
+        
+        # Métricas de rendimiento
+        current_time = time.time()
+        step_time = current_time - self.prev_time
+        self.tb_writer.add_scalar('Performance/step_time', step_time, self.global_step)
+        self.tb_writer.add_scalar('Performance/samples_per_second', 
+                                self.batch_size / step_time if step_time > 0 else 0, 
+                                self.global_step)
+        
+        self.prev_time = current_time
+        self.global_step += 1
+
 def main(sample_size: int = None):
-    # Load your datasets here
     from utils.load import LoadDataCSV
-    import logging
+    
+    # Configurar logging para mostrar información sobre CUDA
+    logging.info(f"CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        logging.info(f"Using GPU: {torch.cuda.get_device_name()}")
+        # Configurar para usar determinismo en CUDA
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
     
     # Initialize configuration
     config = TrainingConfig()
