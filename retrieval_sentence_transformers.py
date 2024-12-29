@@ -11,6 +11,7 @@ from transformers import AutoTokenizer
 import numpy as np
 from tqdm.auto import tqdm
 import random
+from sentence_transformers.callbacks import TensorBoardCallback
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(message)s',
@@ -123,6 +124,12 @@ class ImprovedE5Retrieval:
         
         self.model.gradient_checkpointing_enable()
         
+        # Crear el callback de TensorBoard
+        tensorboard_callback = TensorBoardCallback(
+            log_dir=os.path.join(self.config.output_path, 'logs'),
+            batch_size=self.config.batch_size
+        )
+        
         self.model.fit(
             train_objectives=[(train_dataloader, self.train_loss)],
             evaluator=evaluator,
@@ -131,7 +138,8 @@ class ImprovedE5Retrieval:
             warmup_steps=warmup_steps,
             output_path=self.config.output_path,
             show_progress_bar=True,
-            use_amp=self.config.use_amp
+            use_amp=self.config.use_amp,
+            callback=tensorboard_callback
         )
     
     def encode_batch(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
