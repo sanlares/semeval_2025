@@ -12,6 +12,8 @@ import numpy as np
 from tqdm.auto import tqdm
 import random
 from transformers.integrations import TensorBoardCallback
+from torch.utils.tensorboard import SummaryWriter
+import time
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(message)s',
@@ -124,9 +126,83 @@ class ImprovedE5Retrieval:
         
         self.model.gradient_checkpointing_enable()
         
-        # Crear el callback de TensorBoard
-        tensorboard_callback = TensorBoardCallback()
-        
+        class EnhancedTensorBoardCallback:
+            def __init__(self, writer, model, batch_size):
+                self.writer = writer
+                self.model = model
+                self.step = 0
+                self.epoch = 0
+                self.batch_size = batch_size
+                self.training_start_time = time.time()
+                self.last_step_time = self.training_start_time
+                self.losses = []
+
+            def on_step_end(self, args, state, control):
+                if state.loss is not None:
+                    current_time = time.time()
+                    
+                    # Pérdida de entrenamiento
+                    self.writer.add_scalar('train/loss', state.loss, self.step)
+                    self.losses.append(state.loss)
+                    
+                    # Velocidad de entrenamiento
+                    step_time = current_time - self.last_step_time
+                    self.writer.add_scalar('train/samples_per_second', self.batch_size / step_time, self.step)
+                    
+                    # Learning rate actual
+                    if hasattr(self.model, 'optimizer') and hasattr(self.model.optimizer, 'param_groups'):
+                        lr = self.model.optimizer.param_groups[0]['lr']
+                        self.writer.add_scalar('train/learning_rate', lr, self.step)
+                    
+                    # Gradientes (norma L2)
+                    total_norm = 0.0
+                    for p in self.model.parameters():
+                        if p.grad is not None:
+                            param_norm = p.grad.data.norm(2)
+                            total_norm += param_norm.item() ** 2
+                    total_norm = total_norm ** 0.5
+                    self.writer.add_scalar('train/gradient_norm', total_norm, self.step)
+                    
+                    # Tiempo transcurrido
+                    elapsed_time = current_time - self.training_start_time
+                    self.writer.add_scalar('train/elapsed_minutes', elapsed_time / 60, self.step)
+                    
+                    self.last_step_time = current_time
+                    self.step += 1
+
+            def on_evaluate(self, args, state, control, metrics=None):
+                if metrics:
+                    # Métricas de evaluación
+                    for key, value in metrics.items():
+                        self.writer.add_scalar(f'eval/{key}', value, self.step)
+                    
+                    # Estadísticas de pérdida
+                    if self.losses:
+                        avg_loss = np.mean(self.losses)
+                        std_loss = np.std(self.losses)
+                        self.writer.add_scalar('train/avg_loss_epoch', avg_loss, self.epoch)
+                        self.writer.add_scalar('train/std_loss_epoch', std_loss, self.epoch)
+                        self.losses = []  # Reset para siguiente época
+                    
+                    self.epoch += 1
+
+            def on_train_end(self, args, state, control):
+                # Tiempo total de entrenamiento
+                total_time = time.time() - self.training_start_time
+                self.writer.add_text(
+                    'training_summary',
+                    f'Total training time: {total_time/60:.2f} minutes\n' +
+                    f'Total steps: {self.step}\n' +
+                    f'Average time per step: {total_time/self.step:.3f} seconds'
+                )
+
+        tb_writer = SummaryWriter(log_dir=os.path.join(self.config.output_path, 'logs'))
+        tensorboard_callback = EnhancedTensorBoardCallback(
+            tb_writer, 
+            self.model, 
+            self.config.batch_size
+        )
+
         self.model.fit(
             train_objectives=[(train_dataloader, self.train_loss)],
             evaluator=evaluator,
@@ -138,6 +214,8 @@ class ImprovedE5Retrieval:
             use_amp=self.config.use_amp,
             callback=tensorboard_callback
         )
+        
+        tb_writer.close()
     
     def encode_batch(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
         """Encode texts in batches with optional caching."""
