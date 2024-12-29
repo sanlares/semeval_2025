@@ -13,3 +13,9 @@ log/
 *.pt
 *.pkl
 *.joblib
+*.csv
+*.json
+*.txt
+*.log
+models/
+.DS_Store

@@ -11,7 +11,7 @@ from transformers import AutoTokenizer
 import numpy as np
 from tqdm.auto import tqdm
 import random
-from sentence_transformers.callbacks import TensorBoardCallback
+from transformers.integrations import TensorBoardCallback
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(message)s',
@@ -125,10 +125,7 @@ class ImprovedE5Retrieval:
         self.model.gradient_checkpointing_enable()
         
         # Crear el callback de TensorBoard
-        tensorboard_callback = TensorBoardCallback(
-            log_dir=os.path.join(self.config.output_path, 'logs'),
-            batch_size=self.config.batch_size
-        )
+        tensorboard_callback = TensorBoardCallback()
         
         self.model.fit(
             train_objectives=[(train_dataloader, self.train_loss)],
