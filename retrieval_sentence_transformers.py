@@ -204,7 +204,7 @@ class ImprovedE5Retrieval:
             train_objectives=[(train_dataloader, self.train_loss)],
             evaluator=evaluator,
             epochs=self.config.num_epochs,
-            evaluation_steps=100,
+            evaluation_steps=1000,
             warmup_steps=warmup_steps,
             output_path=self.config.output_path,
             show_progress_bar=True,
