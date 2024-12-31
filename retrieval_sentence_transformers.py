@@ -42,10 +42,10 @@ class TrainingConfig:
     output_path: str = "models/sentence-transformer-fact-check"
     max_seq_length: int = 512
     pooling_mode: str = "mean"  # Options: mean, max, cls
-    embedding_dim: int = 128
+    embedding_dim: int = 384
     batch_size: int = 16  # Aumentado ya que tienes suficiente memoria GPU
     gradient_accumulation_steps: int = 2  # Reducido ya que aumentamos el batch_size
-    num_epochs: int = 3
+    num_epochs: int = 6
     temperature: float = 0.05
     learning_rate: float = 2e-5
     use_amp: bool = True  # Use automatic mixed precision

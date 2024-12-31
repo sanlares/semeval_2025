@@ -5,19 +5,14 @@ This is just a quick script that is able to load the files. Just using pandas ca
 import ast
 import os
 import json
-
 import pandas as pd
-
 from sklearn.model_selection import train_test_split
 
 class LoadDataCSV:
-
     def __init__(self):
-
         self.our_dataset_path = 'data/'
     
     def load_data(self):
-
         posts_path = os.path.join(self.our_dataset_path, 'posts.csv')
         fact_checks_path = os.path.join(self.our_dataset_path, 'fact_checks.csv')
         fact_check_post_mapping_path = os.path.join(self.our_dataset_path, 'pairs.csv')
@@ -25,35 +20,23 @@ class LoadDataCSV:
         for path in [posts_path, fact_checks_path, fact_check_post_mapping_path]:
             assert os.path.isfile(path)
 
-        # We need to apply t = t.replace('\n', '\\n') for text fields before using `ast.literal_eval`.
-        # `ast.literal_eval` has problems when there are new lines in the text, e.g.:
-        # `ast.literal_eval('("\n")')` effectively tries to interpret the following code:
-
-        # ```
-        # ("
-        # ")
-        # ```
-
-        # This raises a SyntaxError exception. By escaping new lines we are able to force it to interpret it properly. There might
-        # be some other way to do this more systematically, but it is a workable fix for now.
-
         parse_col = lambda s: ast.literal_eval(s.replace('\n', '\\n')) if s else s
 
         df_fact_checks = pd.read_csv(fact_checks_path).fillna('').set_index('fact_check_id')
         for col in ['claim', 'instances', 'title']:
             df_fact_checks[col] = df_fact_checks[col].apply(parse_col)
 
-
         df_posts = pd.read_csv(posts_path).fillna('').set_index('post_id')
         for col in ['instances', 'ocr', 'verdicts', 'text']:
             df_posts[col] = df_posts[col].apply(parse_col)
-
 
         df_fact_check_post_mapping = pd.read_csv(fact_check_post_mapping_path) 
 
         return df_fact_checks, df_posts, df_fact_check_post_mapping
 
+    @staticmethod
     def combine_ocr_text(row):
+        """Combines OCR and text fields into a single text field"""
         ocr = row['ocr']
         text = row['text']
 
@@ -79,7 +62,9 @@ class LoadDataCSV:
 
         return result.strip()
     
+    @staticmethod
     def combine_claim_text(row):
+        """Combines claim and title fields into a single text field"""
         claim = row['claim']
         title = row['title']
 
@@ -110,22 +95,11 @@ class LoadDataCSV:
                 pass
 
         return result.strip()
-    
+
     def split_data(self):
         """
         Splits the data into fact checks, posts_train, and posts_dev datasets for each language in tasks.json.
-        Adds a 'language' column to each dataset and includes unique identifiers for each dataset:
-            - 'fact_check_id' for fact_checks
-            - 'post_id' for posts_train
-            - 'post_id' for posts_dev
-
-        Returns:
-            dict: A dictionary containing the datasets for all languages with the format:
-                {
-                    "fact_checks": DataFrame,
-                    "posts_train": DataFrame,
-                    "posts_dev": DataFrame
-                }
+        Also creates train/val splits for training data.
         """
         # Load the data
         df_fact_checks, df_posts, df_pairs = self.load_data()
@@ -134,18 +108,10 @@ class LoadDataCSV:
         with open(os.path.join(self.our_dataset_path, 'tasks.json'), 'r') as f:
             tasks = json.load(f)
 
-        # Initialize dictionaries for storing datasets
+        # Initialize lists for storing datasets
         fact_checks_all = []
         posts_train_all = []
         posts_dev_all = []
-        pairs_all = []
-
-        posts_train_train = []
-        posts_train_val = []
-        fact_checks_train = []
-        fact_checks_val = []
-        pairs_train = []
-        pairs_val = []
 
         # Iterate through all languages in monolingual data
         for language, language_data in tasks["monolingual"].items():
@@ -170,52 +136,40 @@ class LoadDataCSV:
             posts_dev['post_id'] = posts_dev.index
             posts_dev['text_ocr'] = posts_dev.apply(self.combine_ocr_text, axis=1)
 
-            posts_train_train, posts_train_val = train_test_split(posts_train, test_size=0.2, random_state=42)
-
-            fact_checks_train=fact_checks[fact_checks.index.isin(df_pairs[df_pairs['post_id'].isin(posts_train_train.index)]['fact_check_id'])]
-            fact_checks_val=fact_checks[fact_checks.index.isin(df_pairs[df_pairs['post_id'].isin(posts_train_val.index)]['fact_check_id'])]
-
-
-            pairs_df=df_pairs[df_pairs['post_id'].isin(posts_train.index)]
-            pairs_train=df_pairs[df_pairs['post_id'].isin(posts_train_train.index)]
-            pairs_val=df_pairs[df_pairs['post_id'].isin(posts_train_val.index)]
-
             # Append to the lists
             fact_checks_all.append(fact_checks)
             posts_train_all.append(posts_train)
             posts_dev_all.append(posts_dev)
 
-            fact_checks_train.append(fact_checks_train)
-            fact_checks_val.append(fact_checks_val)
-            pairs_train.append(pairs_train)
-            pairs_val.append(pairs_val)
-            pairs_all.append(pairs_df)
-
         # Concatenate all language-specific dataframes
-        fact_checks_df = pd.concat(fact_checks_all, ignore_index=True)
-        posts_train_df = pd.concat(posts_train_all, ignore_index=True)
-        posts_dev_df = pd.concat(posts_dev_all, ignore_index=True)
-        pairs_df = pd.concat(pairs_all, ignore_index=True)
+        fact_checks_df = pd.concat(fact_checks_all, ignore_index=False)
+        posts_train_df = pd.concat(posts_train_all, ignore_index=False)
+        posts_dev_df = pd.concat(posts_dev_all, ignore_index=False)
 
-        posts_train_train_df = pd.concat(posts_train_train, ignore_index=True)
-        posts_train_val_df = pd.concat(posts_train_val, ignore_index=True)
-        fact_checks_train_df = pd.concat(fact_checks_train, ignore_index=True)
-        fact_checks_val_df = pd.concat(fact_checks_val, ignore_index=True)
-        pairs_train_df = pd.concat(pairs_train, ignore_index=True)
-        pairs_val_df = pd.concat(pairs_val, ignore_index=True)
+        # Create train/val split
+        posts_train_train, posts_train_val = train_test_split(
+            posts_train_df, test_size=0.2, random_state=42, stratify=posts_train_df['language']
+        )
 
-        # Return as a dictionary
+        # Filter pairs for train and val
+        pairs_train = df_pairs[df_pairs['post_id'].isin(posts_train_train.index)]
+        pairs_val = df_pairs[df_pairs['post_id'].isin(posts_train_val.index)]
+
+        # Filter fact checks for train and val based on pairs
+        fact_checks_train = fact_checks_df[fact_checks_df.index.isin(pairs_train['fact_check_id'])]
+        fact_checks_val = fact_checks_df[fact_checks_df.index.isin(pairs_val['fact_check_id'])]
+
         return {
             "fact_checks": fact_checks_df,
             "posts_train": posts_train_df,
             "posts_dev": posts_dev_df,
-            "pairs": pairs_df,
-            "posts_train_train": posts_train_train_df,
-            "posts_train_val": posts_train_val_df,
-            "fact_checks_train": fact_checks_train_df,
-            "fact_checks_val": fact_checks_val_df,
-            "pairs_train": pairs_train_df,
-            "pairs_val": pairs_val_df
+            "pairs": df_pairs,
+            "posts_train_train": posts_train_train,
+            "posts_train_val": posts_train_val,
+            "fact_checks_train": fact_checks_train,
+            "fact_checks_val": fact_checks_val,
+            "pairs_train": pairs_train,
+            "pairs_val": pairs_val
         }
 
     
