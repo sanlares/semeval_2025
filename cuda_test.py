@@ -74,6 +74,30 @@ def test_cuda_operation():
     else:
         print("CUDA is not available for testing operations")
 
+def check_mps_device():
+    """Check MPS device availability and perform a basic operation"""
+    print("\n=== MPS Device Check ===")
+    if torch.backends.mps.is_available():
+        print("MPS is available")
+        try:
+            # Create a tensor on CPU
+            x = torch.rand(5, 3)
+            print("CPU Tensor created successfully")
+            
+            # Move tensor to MPS
+            device = torch.device("mps")
+            x = x.to(device)
+            print("Tensor successfully moved to MPS")
+            
+            # Perform a simple operation
+            y = x * 2
+            print("MPS operation completed successfully")
+            
+        except Exception as e:
+            print(f"Error during MPS operation: {e}")
+    else:
+        print("MPS is not available")
+
 def main():
     print("=== CUDA Diagnostic Tool ===")
     print(f"Operating System: {platform.system()} {platform.release()}")
@@ -84,6 +108,7 @@ def main():
     check_pytorch_setup()
     check_gpu_memory()
     test_cuda_operation()
+    check_mps_device()
     
     print("\n=== Environment Variables ===")
     cuda_related_vars = {k: v for k, v in os.environ.items() if 'CUDA' in k}
