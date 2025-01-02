@@ -13,8 +13,8 @@ log/
 *.pt
 *.pkl
 *.joblib
-*.csv
-*.json
+#*.csv
+#*.json
 *.txt
 *.log
 models/
