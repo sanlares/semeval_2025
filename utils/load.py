@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 
 class LoadDataCSV:
     def __init__(self):
-        self.our_dataset_path = 'data/'
+        self.our_dataset_path = 'data/original'
     
     def load_data(self):
         posts_path = os.path.join(self.our_dataset_path, 'posts.csv')
@@ -170,6 +170,90 @@ class LoadDataCSV:
             "fact_checks_val": fact_checks_val,
             "pairs_train": pairs_train,
             "pairs_val": pairs_val
+        }
+
+    def split_crosslingual_data(self):
+        """
+        Splits the data for the crosslingual task based on tasks.json.
+        Creates train/val splits for training data.
+        
+        Returns:
+            Dictionary containing:
+            - fact_checks_cross: All fact checks for crosslingual task
+            - posts_train_cross: Training posts for crosslingual task
+            - posts_dev_cross: Development posts for crosslingual task
+            - pairs_cross: All pairs for crosslingual task
+            - posts_train_train_cross: Training split of training posts
+            - posts_train_val_cross: Validation split of training posts
+            - fact_checks_train_cross: Fact checks for training
+            - fact_checks_val_cross: Fact checks for validation
+            - pairs_train_cross: Training pairs
+            - pairs_val_cross: Validation pairs
+        """
+        # Load the data
+        df_fact_checks, df_posts, df_pairs = self.load_data()
+
+        # Load tasks.json
+        with open(os.path.join(self.our_dataset_path, 'tasks.json'), 'r') as f:
+            tasks = json.load(f)
+
+        # Get crosslingual data
+        crosslingual_data = tasks["crosslingual"]
+        
+        # Extract IDs for crosslingual task
+        fact_check_ids = crosslingual_data["fact_checks"]
+        posts_train_ids = crosslingual_data["posts_train"]
+        posts_dev_ids = crosslingual_data["posts_dev"]
+
+        # Filter and process fact checks
+        fact_checks_cross = df_fact_checks[df_fact_checks.index.isin(fact_check_ids)].copy()
+        fact_checks_cross['fact_check_id'] = fact_checks_cross.index
+        fact_checks_cross['claim_title'] = fact_checks_cross.apply(self.combine_claim_text, axis=1)
+
+        # Filter and process training posts
+        posts_train_cross = df_posts[df_posts.index.isin(posts_train_ids)].copy()
+        posts_train_cross['post_id'] = posts_train_cross.index
+        posts_train_cross['text_ocr'] = posts_train_cross.apply(self.combine_ocr_text, axis=1)
+
+        # Filter and process development posts
+        posts_dev_cross = df_posts[df_posts.index.isin(posts_dev_ids)].copy()
+        posts_dev_cross['post_id'] = posts_dev_cross.index
+        posts_dev_cross['text_ocr'] = posts_dev_cross.apply(self.combine_ocr_text, axis=1)
+
+        # Filter pairs for crosslingual task
+        pairs_cross = df_pairs[
+            df_pairs['post_id'].isin(posts_train_cross.index) & 
+            df_pairs['fact_check_id'].isin(fact_checks_cross.index)
+        ]
+
+        # Create train/val split for training posts
+        # We stratify by language to maintain language distribution
+        posts_train_train_cross, posts_train_val_cross = train_test_split(
+            posts_train_cross, 
+            test_size=0.2, 
+            random_state=42,
+            stratify=posts_train_cross['language'] if 'language' in posts_train_cross.columns else None
+        )
+
+        # Filter pairs for train and val
+        pairs_train_cross = pairs_cross[pairs_cross['post_id'].isin(posts_train_train_cross.index)]
+        pairs_val_cross = pairs_cross[pairs_cross['post_id'].isin(posts_train_val_cross.index)]
+
+        # Filter fact checks for train and val based on pairs
+        fact_checks_train_cross = fact_checks_cross[fact_checks_cross.index.isin(pairs_train_cross['fact_check_id'])]
+        fact_checks_val_cross = fact_checks_cross[fact_checks_cross.index.isin(pairs_val_cross['fact_check_id'])]
+
+        return {
+            "fact_checks_cross": fact_checks_cross,
+            "posts_train_cross": posts_train_cross,
+            "posts_dev_cross": posts_dev_cross,
+            "pairs_cross": pairs_cross,
+            "posts_train_train_cross": posts_train_train_cross,
+            "posts_train_val_cross": posts_train_val_cross,
+            "fact_checks_train_cross": fact_checks_train_cross,
+            "fact_checks_val_cross": fact_checks_val_cross,
+            "pairs_train_cross": pairs_train_cross,
+            "pairs_val_cross": pairs_val_cross
         }
 
     

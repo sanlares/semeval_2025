@@ -13,9 +13,11 @@ log/
 *.pt
 *.pkl
 *.joblib
-#*.csv
-#*.json
+*.csv
+*.json
 *.txt
 *.log
 models/
 .DS_Store
+models/
+wandb/

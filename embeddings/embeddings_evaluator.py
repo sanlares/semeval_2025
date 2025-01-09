@@ -7,6 +7,7 @@ import logging
 from typing import Optional, List
 import os
 import pickle
+import json
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(message)s',
@@ -14,34 +15,65 @@ logging.basicConfig(format='%(asctime)s - %(message)s',
                    level=logging.INFO)
 
 class EmbeddingsEvaluator:
-    def __init__(self, model_name: str, save_model: bool = True):
+    def __init__(self, model_name_or_path: str, model_type: str = 'base', save_model: bool = True):
         """
         Initialize the evaluator with a SentenceTransformer model.
         
         Args:
-            model_name: Name of the HuggingFace model to use (e.g., 'intfloat/multilingual-e5-small')
-            save_model: Whether to save the model locally (default: True)
+            model_name_or_path: Name of the HuggingFace model or path to local model
+            model_type: Type of model to load ('base' or 'fine-tuned')
+            save_model: Whether to save the model locally (only applies to base models)
         """
-        self.model_name = model_name
-        model_path = os.path.join('models', 'base-models', model_name.split('/')[-1])
+        self.model_name = model_name_or_path
+        self.model_type = model_type
         
-        if save_model and os.path.exists(model_path):
-            logging.info(f"Loading model from local path: {model_path}")
-            self.model = SentenceTransformer(model_path)
-        else:
-            logging.info(f"Loading model from HuggingFace: {model_name}")
-            self.model = SentenceTransformer(model_name)
-            if save_model:
-                logging.info(f"Saving model to: {model_path}")
-                os.makedirs(model_path, exist_ok=True)
-                self.model.save(model_path)
+        # Determine model path based on type
+        if model_type == 'base':
+            model_path = os.path.join('models', 'base-models', model_name_or_path.split('/')[-1])
+            
+            if save_model and os.path.exists(model_path):
+                logging.info(f"Loading base model from local path: {model_path}")
+                self.model = SentenceTransformer(model_path)
+            else:
+                logging.info(f"Loading base model from HuggingFace: {model_name_or_path}")
+                self.model = SentenceTransformer(model_name_or_path)
+                if save_model:
+                    logging.info(f"Saving model to: {model_path}")
+                    os.makedirs(model_path, exist_ok=True)
+                    self.model.save(model_path)
+        else:  # fine-tuned
+            if not os.path.exists(model_name_or_path):
+                # Try to find in fine-tuned-models directory
+                alt_path = os.path.join('models', 'fine-tuned-models', model_name_or_path)
+                if os.path.exists(alt_path):
+                    model_name_or_path = alt_path
+                else:
+                    raise ValueError(f"Fine-tuned model not found at {model_name_or_path} or {alt_path}")
+            
+            logging.info(f"Loading fine-tuned model from: {model_name_or_path}")
+            self.model = SentenceTransformer(model_name_or_path)
                 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model.to(self.device)
         
+    @classmethod
+    def from_pretrained(cls, model_path: str, model_type: str = 'base') -> 'EmbeddingsEvaluator':
+        """
+        Load a model from a local path.
+        
+        Args:
+            model_path: Path to the saved model
+            model_type: Type of model to load ('base' or 'fine-tuned')
+            
+        Returns:
+            EmbeddingsEvaluator instance
+        """
+        return cls(model_path, model_type=model_type, save_model=False)
+        
     def load_data(self, 
                  data_paths: dict,
                  columns: dict,
+                 mode: str = 'evaluation',  # 'evaluation' or 'prediction'
                  language: Optional[str] = None,
                  fact_checks_prefix: Optional[str] = None,
                  posts_prefix: Optional[str] = None) -> None:
@@ -52,19 +84,24 @@ class EmbeddingsEvaluator:
             data_paths: Dictionary containing paths to required files:
                 - fact_checks: path to fact checks CSV
                 - posts: path to posts CSV
-                - pairs: path to pairs CSV for evaluation
+                - pairs: path to pairs CSV for evaluation (only required in evaluation mode)
+                - predictions_json: path to predictions JSON file (only required in prediction mode)
             columns: Dictionary containing column names to use:
                 - fact_checks_id: column name for fact check IDs
                 - fact_checks_text: column name for fact check text to embed
                 - posts_id: column name for post IDs
                 - posts_text: column name for post text to embed
                 - posts_language: column name for language in posts
-                - pairs_post_id: column name for post IDs in pairs
-                - pairs_fact_check_id: column name for fact check IDs in pairs
+                - pairs_post_id: column name for post IDs in pairs (only for evaluation mode)
+                - pairs_fact_check_id: column name for fact check IDs in pairs (only for evaluation mode)
+            mode: Operation mode - 'evaluation' or 'prediction'
             language: Optional language to filter posts by. If None, use all languages.
             fact_checks_prefix: Optional prefix to add to fact check texts (e.g., "query: ")
             posts_prefix: Optional prefix to add to post texts (e.g., "passage: ")
         """
+        if mode not in ['evaluation', 'prediction']:
+            raise ValueError("Mode must be either 'evaluation' or 'prediction'")
+            
         logging.info("Loading data files...")
         
         # Load fact checks
@@ -103,21 +140,38 @@ class EmbeddingsEvaluator:
             
         self.posts_language_col = columns['posts_language']
         
-        # Load pairs with correct column names
-        self.pairs = pd.read_csv(data_paths['pairs'])
-        self.pairs = self.pairs.rename(columns={
-            columns['pairs_post_id']: 'post_id',
-            columns['pairs_fact_check_id']: 'fact_check_id'
-        })
+        # Load pairs or predictions based on mode
+        if mode == 'evaluation':
+            if 'pairs' not in data_paths:
+                raise ValueError("pairs path is required in evaluation mode")
+                
+            self.pairs = pd.read_csv(data_paths['pairs'])
+            self.pairs = self.pairs.rename(columns={
+                columns['pairs_post_id']: 'post_id',
+                columns['pairs_fact_check_id']: 'fact_check_id'
+            })
+            
+            if language:
+                # Filter pairs to only include posts and fact checks in the filtered language
+                self.pairs = self.pairs[
+                    self.pairs['post_id'].isin(self.posts.index) & 
+                    self.pairs['fact_check_id'].isin(self.fact_checks.index)
+                ]
+        else:  # prediction mode
+            if 'predictions_json' not in data_paths:
+                raise ValueError("predictions_json path is required in prediction mode")
+                
+            import json
+            with open(data_paths['predictions_json'], 'r') as f:
+                predictions_dict = json.load(f)
+            self.post_ids_to_predict = list(map(int, predictions_dict.keys()))
         
-        if language:
-            # Filter pairs to only include posts and fact checks in the filtered language
-            self.pairs = self.pairs[
-                self.pairs['post_id'].isin(self.posts.index) & 
-                self.pairs['fact_check_id'].isin(self.fact_checks.index)
-            ]
-        
-        logging.info(f"Data loaded successfully. Posts shape: {self.posts.shape}, Fact checks shape: {self.fact_checks.shape}, Pairs shape: {self.pairs.shape}")
+        # Log data info
+        logging.info(f"Data loaded successfully. Posts shape: {self.posts.shape}, Fact checks shape: {self.fact_checks.shape}")
+        if mode == 'evaluation':
+            logging.info(f"Pairs shape: {self.pairs.shape}")
+        else:
+            logging.info(f"Number of posts to predict: {len(self.post_ids_to_predict)}")
         
         # Log language distribution
         if not language:
@@ -127,7 +181,7 @@ class EmbeddingsEvaluator:
             logging.info(posts_lang_dist)
             logging.info("\nFact checks language distribution:")
             logging.info(fact_checks_lang_dist)
-        
+            
     def generate_embeddings(self, texts: list, save_path: Optional[str] = None) -> np.ndarray:
         """
         Generate embeddings for a list of texts.
@@ -140,46 +194,77 @@ class EmbeddingsEvaluator:
             numpy array of embeddings
         """
         logging.info("Generating embeddings...")
-        embeddings = self.model.encode(texts,
-                                     batch_size=16,
-                                     show_progress_bar=True,
-                                     convert_to_numpy=True,
-                                     normalize_embeddings=True)
-        
-        if save_path:
-            logging.info(f"Saving embeddings to: {save_path}")
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            with open(save_path, 'wb') as f:
-                pickle.dump(embeddings, f)
-                
-        return embeddings
+        try:
+            embeddings = self.model.encode(texts,
+                                         batch_size=16,
+                                         show_progress_bar=True,
+                                         convert_to_numpy=True,
+                                         normalize_embeddings=True)
+            
+            if save_path:
+                logging.info(f"Saving embeddings to: {save_path}")
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                with open(save_path, 'wb') as f:
+                    pickle.dump(embeddings, f)
+                    
+            return embeddings
+        except Exception as e:
+            logging.error(f"Error generating embeddings: {str(e)}")
+            raise
         
     def get_similarities(self, 
-                        posts_ids: list, 
+                        posts_ids: Optional[List[int]] = None,
                         same_language_only: bool = False,
-                        save_embeddings: bool = True) -> tuple:
+                        save_embeddings: bool = True,
+                        predictions_output_path: Optional[str] = None,
+                        force_regenerate: bool = False) -> tuple:
         """
         Calculate similarities between given posts and fact checks.
         
         Args:
-            posts_ids: List of post IDs to process
+            posts_ids: List of post IDs to process. If None and in prediction mode, uses post_ids_to_predict
             same_language_only: Whether to only consider fact checks in the same language as the post
             save_embeddings: Whether to save the generated embeddings
+            predictions_output_path: Path where to save predictions JSON file (only used in prediction mode)
+            force_regenerate: If True, regenerate embeddings even if they exist in cache
             
         Returns:
             Tuple containing:
             - similarities matrix (list of arrays, as lengths may vary with language filtering)
             - top 10 fact check IDs for each post
         """
-        embeddings_dir = os.path.join('models', 'base-models', self.model_name.split('/')[-1], 'embeddings')
+        # If no posts_ids provided and in prediction mode, use post_ids_to_predict
+        if posts_ids is None and hasattr(self, 'post_ids_to_predict'):
+            posts_ids = self.post_ids_to_predict
+        elif posts_ids is None:
+            raise ValueError("posts_ids must be provided when not in prediction mode")
+            
+        # Determine embeddings directory based on model type and name
+        if self.model_type == 'base':
+            embeddings_dir = os.path.join('models', 'base-models', self.model_name.split('/')[-1], 'embeddings')
+        else:
+            model_name = os.path.basename(self.model_name)
+            embeddings_dir = os.path.join('models', 'fine-tuned-models', model_name, 'embeddings')
+            
         fact_checks_emb_path = os.path.join(embeddings_dir, 'fact_checks.pkl')
         posts_emb_path = os.path.join(embeddings_dir, 'posts.pkl')
         
         # Generate or load fact checks embeddings
-        if save_embeddings and os.path.exists(fact_checks_emb_path):
+        if not force_regenerate and save_embeddings and os.path.exists(fact_checks_emb_path):
             logging.info(f"Loading fact checks embeddings from: {fact_checks_emb_path}")
             with open(fact_checks_emb_path, 'rb') as f:
                 fact_checks_embeddings = pickle.load(f)
+                
+            # Verify embeddings dimension matches current model
+            sample_text = self.fact_checks[self.fact_checks_text_col].iloc[0]
+            sample_embedding = self.generate_embeddings([sample_text])[0]
+            if sample_embedding.shape[0] != fact_checks_embeddings[0].shape[0]:
+                logging.info(f"Saved embeddings dimension ({fact_checks_embeddings[0].shape[0]}) doesn't match current model ({sample_embedding.shape[0]}). Regenerating embeddings...")
+                fact_checks_texts = self.fact_checks[self.fact_checks_text_col].tolist()
+                fact_checks_embeddings = self.generate_embeddings(
+                    fact_checks_texts,
+                    save_path=fact_checks_emb_path if save_embeddings else None
+                )
         else:
             fact_checks_texts = self.fact_checks[self.fact_checks_text_col].tolist()
             fact_checks_embeddings = self.generate_embeddings(
@@ -200,26 +285,32 @@ class EmbeddingsEvaluator:
         
         # Process each post
         for i, post_id in enumerate(posts_ids):
-            post_embedding = posts_embeddings[i:i+1]  # Keep 2D shape
+            post_embedding = posts_embeddings[i].reshape(1, -1)  # Ensure 2D shape
             
             if same_language_only:
                 # Get post language
                 post_language = self.posts.loc[post_id, self.posts_language_col]
                 # Get fact checks in the same language
-                same_lang_mask = self.fact_checks[self.posts_language_col] == post_language
-                valid_fact_checks_embeddings = fact_checks_embeddings[same_lang_mask]
-                valid_fact_checks_indices = np.where(same_lang_mask)[0]
+                fact_checks_subset = self.fact_checks[self.fact_checks[self.posts_language_col] == post_language]
                 
-                if len(valid_fact_checks_indices) == 0:
+                if len(fact_checks_subset) == 0:
                     logging.warning(f"No fact checks found for language {post_language}, using all fact checks for post {post_id}")
                     valid_fact_checks_embeddings = fact_checks_embeddings
                     valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
+                else:
+                    # Get embeddings for fact checks in the same language
+                    valid_fact_checks_indices = fact_checks_subset.index.map(lambda x: self.fact_checks.index.get_loc(x))
+                    valid_fact_checks_embeddings = fact_checks_embeddings[valid_fact_checks_indices]
             else:
                 valid_fact_checks_embeddings = fact_checks_embeddings
                 valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
             
             # Calculate similarities
-            similarities = cosine_similarity(post_embedding, valid_fact_checks_embeddings)
+            try:
+                similarities = cosine_similarity(post_embedding, valid_fact_checks_embeddings)
+            except ValueError as e:
+                logging.error(f"Dimension mismatch - Post embedding shape: {post_embedding.shape}, Fact check embeddings shape: {valid_fact_checks_embeddings.shape}")
+                raise
             
             # Get top 10 indices (or less if not enough fact checks)
             num_results = min(10, len(valid_fact_checks_indices))
@@ -231,6 +322,10 @@ class EmbeddingsEvaluator:
             
             all_top_10_ids.append(top_k_ids)
             all_similarities.append(similarities[0])
+        
+        # At the end, after generating predictions:
+        if predictions_output_path and hasattr(self, 'post_ids_to_predict'):
+            self.save_predictions(posts_ids, all_top_10_ids, predictions_output_path)
         
         return all_similarities, all_top_10_ids
         
@@ -358,6 +453,25 @@ class EmbeddingsEvaluator:
             all_similarities.append(similarities[0])
         
         return all_similarities, all_top_10_ids
+
+    def save_predictions(self, post_ids: List[int], top_k_predictions: List[List[int]], output_path: str) -> None:
+        """
+        Save predictions to a JSON file in the required format.
+        
+        Args:
+            post_ids: List of post IDs
+            top_k_predictions: List of lists containing top k fact check IDs for each post
+            output_path: Path where to save the predictions JSON file
+        """
+        predictions_dict = {str(post_id): pred_list for post_id, pred_list in zip(post_ids, top_k_predictions)}
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Save predictions
+        with open(output_path, 'w') as f:
+            json.dump(predictions_dict, f, indent=4)
+        logging.info(f"Predictions saved to: {output_path}")
 
 # Example usage:
 if __name__ == "__main__":

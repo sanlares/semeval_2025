@@ -4,8 +4,10 @@ import argparse
 def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Generate embeddings and evaluate fact-checking predictions')
-    parser.add_argument('--model_name', type=str, default='intfloat/multilingual-e5-small',
-                      help='Name of the HuggingFace model to use')
+    parser.add_argument('--model_name_or_path', type=str, default='intfloat/multilingual-e5-small',
+                      help='Name of the HuggingFace model or path to local model')
+    parser.add_argument('--model_type', type=str, default='base', choices=['base', 'fine-tuned'],
+                      help='Type of model to load')
     parser.add_argument('--fact_checks_path', type=str, default='data/transformed/fact_checks.csv',
                       help='Path to fact checks CSV file')
     parser.add_argument('--posts_path', type=str, default='data/transformed/posts.csv',
@@ -20,6 +22,8 @@ def main():
                       help='Prefix to add to fact check texts (e.g., "query: ")')
     parser.add_argument('--posts_prefix', type=str, default=None,
                       help='Prefix to add to post texts (e.g., "passage: ")')
+    parser.add_argument('--save_model', action='store_true',
+                      help='Whether to save the base model locally')
     
     # Column names arguments
     parser.add_argument('--fact_checks_id_col', type=str, default='fact_check_id',
@@ -40,7 +44,11 @@ def main():
     args = parser.parse_args()
     
     # Initialize evaluator
-    evaluator = EmbeddingsEvaluator(args.model_name)
+    evaluator = EmbeddingsEvaluator(
+        args.model_name_or_path,
+        model_type=args.model_type,
+        save_model=args.save_model
+    )
     
     # Define column names
     columns = {
