@@ -20,41 +20,57 @@ class EmbeddingsEvaluator:
         Initialize the evaluator with a SentenceTransformer model.
         
         Args:
-            model_name_or_path: Name of the HuggingFace model or path to local model
-            model_type: Type of model to load ('base' or 'fine-tuned')
+            model_name_or_path: Name of the HuggingFace model, path to local model, or directory containing language-specific models
+            model_type: Type of model to load ('base', 'fine-tuned', or 'language-specific')
             save_model: Whether to save the model locally (only applies to base models)
         """
         self.model_name = model_name_or_path
         self.model_type = model_type
         
-        # Determine model path based on type
-        if model_type == 'base':
-            model_path = os.path.join('models', 'base-models', model_name_or_path.split('/')[-1])
-            
-            if save_model and os.path.exists(model_path):
-                logging.info(f"Loading base model from local path: {model_path}")
-                self.model = SentenceTransformer(model_path)
-            else:
-                logging.info(f"Loading base model from HuggingFace: {model_name_or_path}")
-                self.model = SentenceTransformer(model_name_or_path)
-                if save_model:
-                    logging.info(f"Saving model to: {model_path}")
-                    os.makedirs(model_path, exist_ok=True)
-                    self.model.save(model_path)
-        else:  # fine-tuned
-            if not os.path.exists(model_name_or_path):
-                # Try to find in fine-tuned-models directory
-                alt_path = os.path.join('models', 'fine-tuned-models', model_name_or_path)
-                if os.path.exists(alt_path):
-                    model_name_or_path = alt_path
-                else:
-                    raise ValueError(f"Fine-tuned model not found at {model_name_or_path} or {alt_path}")
-            
-            logging.info(f"Loading fine-tuned model from: {model_name_or_path}")
-            self.model = SentenceTransformer(model_name_or_path)
+        # Only load a model if not using language-specific models
+        if model_type != 'language-specific':
+            # Determine model path based on type
+            if model_type == 'base':
+                model_path = os.path.join('models', 'base-models', model_name_or_path.split('/')[-1])
                 
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model.to(self.device)
+                if save_model and os.path.exists(model_path):
+                    logging.info(f"Loading base model from local path: {model_path}")
+                    self.model = SentenceTransformer(model_path)
+                else:
+                    logging.info(f"Loading base model from HuggingFace: {model_name_or_path}")
+                    self.model = SentenceTransformer(model_name_or_path)
+                    if save_model:
+                        logging.info(f"Saving model to: {model_path}")
+                        os.makedirs(model_path, exist_ok=True)
+                        self.model.save(model_path)
+            else:  # fine-tuned
+                if not os.path.exists(model_name_or_path):
+                    # Try to find in fine-tuned-models directory
+                    alt_path = os.path.join('models', 'fine-tuned-models', model_name_or_path)
+                    if os.path.exists(alt_path):
+                        model_name_or_path = alt_path
+                    else:
+                        raise ValueError(f"Fine-tuned model not found at {model_name_or_path} or {alt_path}")
+                
+                logging.info(f"Loading fine-tuned model from: {model_name_or_path}")
+                self.model = SentenceTransformer(model_name_or_path)
+                
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.model.to(self.device)
+        else:
+            # For language-specific models, verify the directory exists and contains model subdirectories
+            if not os.path.exists(model_name_or_path):
+                raise ValueError(f"Language models directory not found at {model_name_or_path}")
+            
+            # Check if directory contains language subdirectories
+            lang_dirs = [d for d in os.listdir(model_name_or_path) 
+                        if os.path.isdir(os.path.join(model_name_or_path, d))]
+            if not lang_dirs:
+                raise ValueError(f"No language model directories found in {model_name_or_path}")
+                
+            logging.info(f"Found language models for: {', '.join(lang_dirs)}")
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.model = None  # No base model for language-specific mode
         
     @classmethod
     def from_pretrained(cls, model_path: str, model_type: str = 'base') -> 'EmbeddingsEvaluator':
@@ -239,95 +255,181 @@ class EmbeddingsEvaluator:
         elif posts_ids is None:
             raise ValueError("posts_ids must be provided when not in prediction mode")
             
-        # Determine embeddings directory based on model type and name
-        if self.model_type == 'base':
-            embeddings_dir = os.path.join('models', 'base-models', self.model_name.split('/')[-1], 'embeddings')
-        else:
-            model_name = os.path.basename(self.model_name)
-            embeddings_dir = os.path.join('models', 'fine-tuned-models', model_name, 'embeddings')
-            
-        fact_checks_emb_path = os.path.join(embeddings_dir, 'fact_checks.pkl')
-        posts_emb_path = os.path.join(embeddings_dir, 'posts.pkl')
+        # Initialize results containers
+        all_top_10_ids = []
+        all_similarities = []
         
-        # Generate or load fact checks embeddings
-        if not force_regenerate and save_embeddings and os.path.exists(fact_checks_emb_path):
-            logging.info(f"Loading fact checks embeddings from: {fact_checks_emb_path}")
-            with open(fact_checks_emb_path, 'rb') as f:
-                fact_checks_embeddings = pickle.load(f)
+        if self.model_type == 'language-specific':
+            # Group posts by language
+            posts_by_language = {}
+            for post_id in posts_ids:
+                lang = self.posts.loc[post_id, self.posts_language_col]
+                if lang not in posts_by_language:
+                    posts_by_language[lang] = []
+                posts_by_language[lang].append(post_id)
+            
+            # Process each language separately
+            for lang, lang_post_ids in posts_by_language.items():
+                logging.info(f"Processing language: {lang}")
                 
-            # Verify embeddings dimension matches current model
-            sample_text = self.fact_checks[self.fact_checks_text_col].iloc[0]
-            sample_embedding = self.generate_embeddings([sample_text])[0]
-            if sample_embedding.shape[0] != fact_checks_embeddings[0].shape[0]:
-                logging.info(f"Saved embeddings dimension ({fact_checks_embeddings[0].shape[0]}) doesn't match current model ({sample_embedding.shape[0]}). Regenerating embeddings...")
+                # Load language-specific model
+                lang_model_path = os.path.join(self.model_name, lang, lang)
+                
+                if not os.path.exists(lang_model_path):
+                    raise ValueError(f"No model found for language {lang} at {lang_model_path}")
+                
+                logging.info(f"Loading language-specific model from: {lang_model_path}")
+                lang_model = SentenceTransformer(lang_model_path)
+                lang_model.to(self.device)
+                
+                try:
+                    # Get fact checks for this language
+                    fact_checks_subset = self.fact_checks[self.fact_checks[self.posts_language_col] == lang]
+                    
+                    if len(fact_checks_subset) == 0:
+                        logging.warning(f"No fact checks found for language {lang}, skipping")
+                        continue
+                    
+                    # Generate embeddings for fact checks
+                    fact_checks_texts = fact_checks_subset[self.fact_checks_text_col].tolist()
+                    fact_checks_embeddings = lang_model.encode(
+                        fact_checks_texts,
+                        batch_size=16,
+                        show_progress_bar=True,
+                        convert_to_numpy=True,
+                        normalize_embeddings=True
+                    )
+                    
+                    # Generate embeddings for posts
+                    posts_texts = [str(self.posts.loc[post_id, self.posts_text_col]) for post_id in lang_post_ids]
+                    posts_embeddings = lang_model.encode(
+                        posts_texts,
+                        batch_size=16,
+                        show_progress_bar=True,
+                        convert_to_numpy=True,
+                        normalize_embeddings=True
+                    )
+                    
+                    # Calculate similarities
+                    similarities = cosine_similarity(posts_embeddings, fact_checks_embeddings)
+                    
+                    # Get top 10 for each post
+                    for i, post_id in enumerate(lang_post_ids):
+                        num_results = min(10, len(fact_checks_subset))
+                        top_k_indices = np.argsort(-similarities[i])[:num_results]
+                        top_k_ids = [int(fact_checks_subset.index[j]) for j in top_k_indices]
+                        
+                        all_top_10_ids.append(top_k_ids)
+                        all_similarities.append(similarities[i])
+                    
+                    # Clear GPU memory
+                    del lang_model
+                    del fact_checks_embeddings
+                    del posts_embeddings
+                    torch.cuda.empty_cache()
+                    
+                except Exception as e:
+                    logging.error(f"Error processing language {lang}: {str(e)}")
+                    del lang_model
+                    torch.cuda.empty_cache()
+                    raise
+                    
+            # Save predictions if needed
+            if predictions_output_path and hasattr(self, 'post_ids_to_predict'):
+                self.save_predictions(posts_ids, all_top_10_ids, predictions_output_path)
+                
+            return all_similarities, all_top_10_ids
+        else:
+            # Original implementation for non-language-specific processing
+            # Determine embeddings directory based on model type and name
+            if self.model_type == 'base':
+                embeddings_dir = os.path.join('models', 'base-models', self.model_name.split('/')[-1], 'embeddings')
+            else:
+                model_name = os.path.basename(self.model_name)
+                embeddings_dir = os.path.join('models', 'fine-tuned-models', model_name, 'embeddings')
+                
+            fact_checks_emb_path = os.path.join(embeddings_dir, 'fact_checks.pkl')
+            posts_emb_path = os.path.join(embeddings_dir, 'posts.pkl')
+            
+            # Generate or load fact checks embeddings
+            if not force_regenerate and save_embeddings and os.path.exists(fact_checks_emb_path):
+                logging.info(f"Loading fact checks embeddings from: {fact_checks_emb_path}")
+                with open(fact_checks_emb_path, 'rb') as f:
+                    fact_checks_embeddings = pickle.load(f)
+                    
+                # Verify embeddings dimension matches current model
+                sample_text = self.fact_checks[self.fact_checks_text_col].iloc[0]
+                sample_embedding = self.generate_embeddings([sample_text])[0]
+                if sample_embedding.shape[0] != fact_checks_embeddings[0].shape[0]:
+                    logging.info(f"Saved embeddings dimension ({fact_checks_embeddings[0].shape[0]}) doesn't match current model ({sample_embedding.shape[0]}). Regenerating embeddings...")
+                    fact_checks_texts = self.fact_checks[self.fact_checks_text_col].tolist()
+                    fact_checks_embeddings = self.generate_embeddings(
+                        fact_checks_texts,
+                        save_path=fact_checks_emb_path if save_embeddings else None
+                    )
+            else:
                 fact_checks_texts = self.fact_checks[self.fact_checks_text_col].tolist()
                 fact_checks_embeddings = self.generate_embeddings(
                     fact_checks_texts,
                     save_path=fact_checks_emb_path if save_embeddings else None
                 )
-        else:
-            fact_checks_texts = self.fact_checks[self.fact_checks_text_col].tolist()
-            fact_checks_embeddings = self.generate_embeddings(
-                fact_checks_texts,
-                save_path=fact_checks_emb_path if save_embeddings else None
-            )
-        
-        # Generate posts embeddings
-        posts_texts = [str(self.posts.loc[post_id, self.posts_text_col]) for post_id in posts_ids]
-        posts_embeddings = self.generate_embeddings(
-            posts_texts,
-            save_path=posts_emb_path if save_embeddings else None
-        )
-        
-        # Initialize arrays for results
-        all_top_10_ids = []
-        all_similarities = []
-        
-        # Process each post
-        for i, post_id in enumerate(posts_ids):
-            post_embedding = posts_embeddings[i].reshape(1, -1)  # Ensure 2D shape
             
-            if same_language_only:
-                # Get post language
-                post_language = self.posts.loc[post_id, self.posts_language_col]
-                # Get fact checks in the same language
-                fact_checks_subset = self.fact_checks[self.fact_checks[self.posts_language_col] == post_language]
+            # Generate posts embeddings
+            posts_texts = [str(self.posts.loc[post_id, self.posts_text_col]) for post_id in posts_ids]
+            posts_embeddings = self.generate_embeddings(
+                posts_texts,
+                save_path=posts_emb_path if save_embeddings else None
+            )
+            
+            # Initialize arrays for results
+            all_top_10_ids = []
+            all_similarities = []
+            
+            # Process each post
+            for i, post_id in enumerate(posts_ids):
+                post_embedding = posts_embeddings[i].reshape(1, -1)  # Ensure 2D shape
                 
-                if len(fact_checks_subset) == 0:
-                    logging.warning(f"No fact checks found for language {post_language}, using all fact checks for post {post_id}")
+                if same_language_only:
+                    # Get post language
+                    post_language = self.posts.loc[post_id, self.posts_language_col]
+                    # Get fact checks in the same language
+                    fact_checks_subset = self.fact_checks[self.fact_checks[self.posts_language_col] == post_language]
+                    
+                    if len(fact_checks_subset) == 0:
+                        logging.warning(f"No fact checks found for language {post_language}, using all fact checks for post {post_id}")
+                        valid_fact_checks_embeddings = fact_checks_embeddings
+                        valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
+                    else:
+                        # Get embeddings for fact checks in the same language
+                        valid_fact_checks_indices = fact_checks_subset.index.map(lambda x: self.fact_checks.index.get_loc(x))
+                        valid_fact_checks_embeddings = fact_checks_embeddings[valid_fact_checks_indices]
+                else:
                     valid_fact_checks_embeddings = fact_checks_embeddings
                     valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
-                else:
-                    # Get embeddings for fact checks in the same language
-                    valid_fact_checks_indices = fact_checks_subset.index.map(lambda x: self.fact_checks.index.get_loc(x))
-                    valid_fact_checks_embeddings = fact_checks_embeddings[valid_fact_checks_indices]
-            else:
-                valid_fact_checks_embeddings = fact_checks_embeddings
-                valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
+                
+                # Calculate similarities
+                try:
+                    similarities = cosine_similarity(post_embedding, valid_fact_checks_embeddings)
+                except ValueError as e:
+                    logging.error(f"Dimension mismatch - Post embedding shape: {post_embedding.shape}, Fact check embeddings shape: {valid_fact_checks_embeddings.shape}")
+                    raise
+                
+                # Get top 10 indices (or less if not enough fact checks)
+                num_results = min(10, len(valid_fact_checks_indices))
+                top_k_local_indices = np.argsort(-similarities[0])[:num_results]
+                # Convert to global indices
+                top_k_global_indices = valid_fact_checks_indices[top_k_local_indices]
+                # Get fact check IDs
+                top_k_ids = [int(self.fact_checks.index[j]) for j in top_k_global_indices]
+                
+                all_top_10_ids.append(top_k_ids)
+                all_similarities.append(similarities[0])
             
-            # Calculate similarities
-            try:
-                similarities = cosine_similarity(post_embedding, valid_fact_checks_embeddings)
-            except ValueError as e:
-                logging.error(f"Dimension mismatch - Post embedding shape: {post_embedding.shape}, Fact check embeddings shape: {valid_fact_checks_embeddings.shape}")
-                raise
+            # At the end, after generating predictions:
+            if predictions_output_path and hasattr(self, 'post_ids_to_predict'):
+                self.save_predictions(posts_ids, all_top_10_ids, predictions_output_path)
             
-            # Get top 10 indices (or less if not enough fact checks)
-            num_results = min(10, len(valid_fact_checks_indices))
-            top_k_local_indices = np.argsort(-similarities[0])[:num_results]
-            # Convert to global indices
-            top_k_global_indices = valid_fact_checks_indices[top_k_local_indices]
-            # Get fact check IDs
-            top_k_ids = [int(self.fact_checks.index[j]) for j in top_k_global_indices]
-            
-            all_top_10_ids.append(top_k_ids)
-            all_similarities.append(similarities[0])
-        
-        # At the end, after generating predictions:
-        if predictions_output_path and hasattr(self, 'post_ids_to_predict'):
-            self.save_predictions(posts_ids, all_top_10_ids, predictions_output_path)
-        
-        return all_similarities, all_top_10_ids
+            return all_similarities, all_top_10_ids
         
     def evaluate(self, posts_ids: list, top_k_predictions: list) -> tuple:
         """

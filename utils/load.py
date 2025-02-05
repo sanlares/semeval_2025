@@ -11,8 +11,12 @@ from sklearn.model_selection import train_test_split
 class LoadDataCSV:
     def __init__(self):
         self.our_dataset_path = 'data/original'
+        self.test_dataset_path = 'data/test_original'
     
-    def load_data(self):
+    def load_data(self, split_type="train"):
+        if split_type=="test":
+            self.our_dataset_path = self.test_dataset_path
+        print(self.our_dataset_path)
         posts_path = os.path.join(self.our_dataset_path, 'posts.csv')
         fact_checks_path = os.path.join(self.our_dataset_path, 'fact_checks.csv')
         fact_check_post_mapping_path = os.path.join(self.our_dataset_path, 'pairs.csv')
@@ -33,6 +37,36 @@ class LoadDataCSV:
         df_fact_check_post_mapping = pd.read_csv(fact_check_post_mapping_path) 
 
         return df_fact_checks, df_posts, df_fact_check_post_mapping
+    
+    def load_data_test(self):
+        posts_path = os.path.join(self.test_dataset_path, 'posts.csv')
+        fact_checks_path = os.path.join(self.test_dataset_path, 'fact_checks.csv')
+
+        for path in [posts_path, fact_checks_path]:
+            assert os.path.isfile(path)
+
+        # Modified parse_col to handle different formats
+        def parse_col(s):
+            if not s or pd.isna(s):
+                return s
+            try:
+                return ast.literal_eval(s.replace('\n', '\\n'))
+            except (ValueError, SyntaxError):
+                return s
+
+        df_fact_checks = pd.read_csv(fact_checks_path).fillna('').set_index('fact_check_id')
+        for col in ['claim', 'instances', 'title']:
+            df_fact_checks[col] = df_fact_checks[col].apply(parse_col)
+
+        df_posts = pd.read_csv(posts_path).fillna('').set_index('post_id')
+        for col in ['instances', 'ocr', 'verdicts', 'text']:
+            df_posts[col] = df_posts[col].apply(parse_col)
+            
+        # Verify the index values
+        print("\nFirst few indices of posts DataFrame:")
+        print(df_posts.index[:5])
+
+        return df_fact_checks, df_posts
 
     @staticmethod
     def combine_ocr_text(row):
@@ -96,15 +130,17 @@ class LoadDataCSV:
 
         return result.strip()
 
-    def split_data(self):
+    def split_data(self, split_type="train"):
         """
         Splits the data into fact checks, posts_train, and posts_dev datasets for each language in tasks.json.
         Also creates train/val splits for training data.
         """
         # Load the data
-        df_fact_checks, df_posts, df_pairs = self.load_data()
+        df_fact_checks, df_posts, df_pairs = self.load_data(split_type)
 
         # Load tasks.json
+        if split_type=="test":
+            self.our_dataset_path = self.test_dataset_path
         with open(os.path.join(self.our_dataset_path, 'tasks.json'), 'r') as f:
             tasks = json.load(f)
 
@@ -256,7 +292,132 @@ class LoadDataCSV:
             "pairs_val_cross": pairs_val_cross
         }
 
-    
+    def split_data_test(self, split_type="test"):
+        """
+        Splits the data into fact checks, posts_train, and posts_dev datasets for each language in tasks.json.
+        Also creates train/val splits for training data.
+        """
+        # Load the data
+        df_fact_checks, df_posts = self.load_data_test()
+
+        # Load tasks.json
+        if split_type=="test":
+            self.our_dataset_path = self.test_dataset_path
+        with open(os.path.join(self.our_dataset_path, 'tasks.json'), 'r') as f:
+            tasks = json.load(f)
+
+        # Initialize lists for storing datasets
+        fact_checks_list = []
+        posts_test_list = []
+
+        # Iterate through all languages in monolingual data
+        for language, language_data in tasks["monolingual"].items():
+            # Extract IDs for the current language
+            fact_check_ids = language_data.get("fact_checks", [])
+            posts_test_ids = language_data.get("posts_test", [])
+
+            print(f"\nLanguage: {language}")
+            print(f"Type of first post_test_id: {type(posts_test_ids[0]) if posts_test_ids else 'No IDs'}")
+            print(f"Type of first df_posts index: {type(df_posts.index[0]) if len(df_posts) > 0 else 'Empty'}")
+            print(f"Sample of posts_test_ids: {posts_test_ids[:5]}")
+            print(f"Sample of df_posts index: {list(df_posts.index[:5])}")
+
+            # Filter and annotate the dataframes
+            fact_checks = df_fact_checks[df_fact_checks.index.isin(fact_check_ids)].copy()
+            fact_checks['language'] = language
+            fact_checks['fact_check_id'] = fact_checks.index
+            fact_checks['claim_title'] = fact_checks.apply(self.combine_claim_text, axis=1)
+
+            print(f"Number of posts_test_ids: {len(posts_test_ids)}")
+            print(f"Number of total posts in df: {len(df_posts)}")
+            posts_test = df_posts[df_posts.index.isin(posts_test_ids)].copy()
+            print(f"Number of matched posts: {len(posts_test)}")
+            
+            # Try converting IDs if there's a type mismatch
+            if len(posts_test) == 0 and posts_test_ids:
+                print("Attempting to convert IDs...")
+                try:
+                    posts_test_ids = [int(id) for id in posts_test_ids]
+                    posts_test = df_posts[df_posts.index.isin(posts_test_ids)].copy()
+                    print(f"After conversion - Number of matched posts: {len(posts_test)}")
+                except Exception as e:
+                    print(f"Conversion failed: {str(e)}")
+                    
+            posts_test['language'] = language
+            print(len(posts_test))
+            posts_test['post_id'] = posts_test.index
+            posts_test['text_ocr'] = posts_test.apply(self.combine_ocr_text, axis=1)
+
+            # Add to the lists
+            fact_checks_list.append(fact_checks)
+            posts_test_list.append(posts_test)
+
+        # Concatenate all language-specific dataframes
+        fact_checks_df = pd.concat(fact_checks_list, ignore_index=False)
+        posts_test_df = pd.concat(posts_test_list, ignore_index=False)
+
+        return {
+            "fact_checks": fact_checks_df,
+            "posts_test": posts_test_df,
+        }
+
+    def split_crosslingual_test_data(self):
+        """
+        Splits the data for the crosslingual test task based on tasks.json.
+        Similar to split_crosslingual_data but adapted for test data.
+        
+        Returns:
+            Dictionary containing:
+            - fact_checks_cross: All fact checks for crosslingual test task
+            - posts_test_cross: Test posts for crosslingual task
+        """
+        # Load the data
+        df_fact_checks, df_posts = self.load_data_test()
+
+        # Load tasks.json
+        with open(os.path.join(self.test_dataset_path, 'tasks.json'), 'r') as f:
+            tasks = json.load(f)
+
+        # Get crosslingual data
+        crosslingual_data = tasks["crosslingual"]
+        
+        # Extract IDs for crosslingual task
+        fact_check_ids = crosslingual_data["fact_checks"]
+        posts_test_ids = crosslingual_data["posts_test"]
+
+        print(f"\nCrosslingual Task:")
+        print(f"Number of fact check IDs: {len(fact_check_ids)}")
+        print(f"Number of test post IDs: {len(posts_test_ids)}")
+
+        # Filter and process fact checks
+        fact_checks_cross = df_fact_checks[df_fact_checks.index.isin(fact_check_ids)].copy()
+        fact_checks_cross['fact_check_id'] = fact_checks_cross.index
+        fact_checks_cross['claim_title'] = fact_checks_cross.apply(self.combine_claim_text, axis=1)
+
+        # Filter and process test posts
+        posts_test_cross = df_posts[df_posts.index.isin(posts_test_ids)].copy()
+        
+        # Try converting IDs if there's a type mismatch
+        if len(posts_test_cross) == 0 and posts_test_ids:
+            print("Attempting to convert IDs...")
+            try:
+                posts_test_ids = [int(id) for id in posts_test_ids]
+                posts_test_cross = df_posts[df_posts.index.isin(posts_test_ids)].copy()
+                print(f"After conversion - Number of matched posts: {len(posts_test_cross)}")
+            except Exception as e:
+                print(f"Conversion failed: {str(e)}")
+
+        posts_test_cross['post_id'] = posts_test_cross.index
+        posts_test_cross['text_ocr'] = posts_test_cross.apply(self.combine_ocr_text, axis=1)
+
+        print(f"Number of matched fact checks: {len(fact_checks_cross)}")
+        print(f"Number of matched test posts: {len(posts_test_cross)}")
+
+        return {
+            "fact_checks_cross": fact_checks_cross,
+            "posts_test_cross": posts_test_cross
+        }
+
 
     
 
