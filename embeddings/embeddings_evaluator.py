@@ -8,6 +8,7 @@ from typing import Optional, List
 import os
 import pickle
 import json
+import faiss
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(message)s',
@@ -220,8 +221,14 @@ class EmbeddingsEvaluator:
             if save_path:
                 logging.info(f"Saving embeddings to: {save_path}")
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                with open(save_path, 'wb') as f:
-                    pickle.dump(embeddings, f)
+                
+                # Change extension to .npy if it ends in .pkl
+                if save_path.endswith('.pkl'):
+                    save_path = save_path[:-4] + '.npy'
+                    
+                logging.info(f"Starting to save embeddings array of shape {embeddings.shape}")
+                np.save(save_path, embeddings)
+                logging.info("Finished saving embeddings")
                     
             return embeddings
         except Exception as e:
@@ -233,7 +240,9 @@ class EmbeddingsEvaluator:
                         same_language_only: bool = False,
                         save_embeddings: bool = True,
                         predictions_output_path: Optional[str] = None,
-                        force_regenerate: bool = False) -> tuple:
+                        force_regenerate: bool = True,
+                        use_faiss: bool = False,
+                        faiss_index_type: str = 'flat') -> tuple:
         """
         Calculate similarities between given posts and fact checks.
         
@@ -243,6 +252,8 @@ class EmbeddingsEvaluator:
             save_embeddings: Whether to save the generated embeddings
             predictions_output_path: Path where to save predictions JSON file (only used in prediction mode)
             force_regenerate: If True, regenerate embeddings even if they exist in cache
+            use_faiss: Whether to use FAISS for fast similarity search (recommended for large datasets)
+            faiss_index_type: Type of FAISS index to use ('flat' for exact search, 'ivf' for approximate)
             
         Returns:
             Tuple containing:
@@ -381,51 +392,117 @@ class EmbeddingsEvaluator:
                 save_path=posts_emb_path if save_embeddings else None
             )
             
-            # Initialize arrays for results
-            all_top_10_ids = []
-            all_similarities = []
-            
-            # Process each post
-            for i, post_id in enumerate(posts_ids):
-                post_embedding = posts_embeddings[i].reshape(1, -1)  # Ensure 2D shape
+            # After generating embeddings, choose search method
+            if use_faiss:
+                logging.info("Using FAISS for similarity search...")
+                all_similarities = []
+                all_top_10_ids = []
                 
+                # Process each language separately if same_language_only
                 if same_language_only:
-                    # Get post language
-                    post_language = self.posts.loc[post_id, self.posts_language_col]
-                    # Get fact checks in the same language
-                    fact_checks_subset = self.fact_checks[self.fact_checks[self.posts_language_col] == post_language]
+                    for i, post_id in enumerate(posts_ids):
+                        post_language = self.posts.loc[post_id, self.posts_language_col]
+                        fact_checks_subset = self.fact_checks[self.fact_checks[self.posts_language_col] == post_language]
+                        
+                        if len(fact_checks_subset) == 0:
+                            logging.warning(f"No fact checks found for language {post_language}, using all fact checks for post {post_id}")
+                            valid_fact_checks = fact_checks_embeddings
+                            valid_indices = np.arange(len(fact_checks_embeddings))
+                        else:
+                            valid_indices = fact_checks_subset.index.map(lambda x: self.fact_checks.index.get_loc(x))
+                            valid_fact_checks = fact_checks_embeddings[valid_indices]
+                        
+                        # Create FAISS index for this language
+                        dimension = valid_fact_checks.shape[1]
+                        if faiss_index_type == 'flat':
+                            index = faiss.IndexFlatIP(dimension)  # Inner product = cosine similarity for normalized vectors
+                        else:  # 'ivf'
+                            nlist = min(int(np.sqrt(len(valid_fact_checks))), 100)  # number of clusters
+                            quantizer = faiss.IndexFlatIP(dimension)
+                            index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_INNER_PRODUCT)
+                            index.train(valid_fact_checks)
+                            index.nprobe = min(20, nlist)  # number of clusters to visit during search
+                        
+                        # Add vectors to index
+                        index.add(valid_fact_checks)
+                        
+                        # Search
+                        post_emb = posts_embeddings[i].reshape(1, -1)
+                        similarities, indices = index.search(post_emb, min(10, len(valid_fact_checks)))
+                        
+                        # Convert local indices to global fact check IDs
+                        if len(fact_checks_subset) > 0:
+                            top_k_ids = [int(fact_checks_subset.index[valid_indices[j]]) for j in indices[0]]
+                        else:
+                            top_k_ids = [int(self.fact_checks.index[j]) for j in indices[0]]
+                        
+                        all_top_10_ids.append(top_k_ids)
+                        all_similarities.append(similarities[0])
+                else:
+                    # Create single FAISS index for all fact checks
+                    dimension = fact_checks_embeddings.shape[1]
+                    if faiss_index_type == 'flat':
+                        index = faiss.IndexFlatIP(dimension)
+                    else:  # 'ivf'
+                        nlist = min(int(np.sqrt(len(fact_checks_embeddings))), 100)
+                        quantizer = faiss.IndexFlatIP(dimension)
+                        index = faiss.IndexIVFFlat(quantizer, dimension, nlist, faiss.METRIC_INNER_PRODUCT)
+                        index.train(fact_checks_embeddings)
+                        index.nprobe = min(20, nlist)
                     
-                    if len(fact_checks_subset) == 0:
-                        logging.warning(f"No fact checks found for language {post_language}, using all fact checks for post {post_id}")
+                    index.add(fact_checks_embeddings)
+                    
+                    # Search for all posts at once
+                    similarities, indices = index.search(posts_embeddings, 10)
+                    
+                    # Convert indices to fact check IDs
+                    for i in range(len(posts_ids)):
+                        top_k_ids = [int(self.fact_checks.index[j]) for j in indices[i]]
+                        all_top_10_ids.append(top_k_ids)
+                        all_similarities.append(similarities[i])
+                
+                logging.info("Finished FAISS similarity search")
+            else:
+                # Original similarity computation code
+                logging.info("Computing similarities using original method...")
+                all_top_10_ids = []
+                all_similarities = []
+                
+                for i, post_id in enumerate(posts_ids):
+                    post_embedding = posts_embeddings[i].reshape(1, -1)
+                    
+                    if same_language_only:
+                        post_language = self.posts.loc[post_id, self.posts_language_col]
+                        fact_checks_subset = self.fact_checks[self.fact_checks[self.posts_language_col] == post_language]
+                        
+                        if len(fact_checks_subset) == 0:
+                            logging.warning(f"No fact checks found for language {post_language}, using all fact checks for post {post_id}")
+                            valid_fact_checks_embeddings = fact_checks_embeddings
+                            valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
+                        else:
+                            valid_fact_checks_indices = fact_checks_subset.index.map(lambda x: self.fact_checks.index.get_loc(x))
+                            valid_fact_checks_embeddings = fact_checks_embeddings[valid_fact_checks_indices]
+                    else:
                         valid_fact_checks_embeddings = fact_checks_embeddings
                         valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
-                    else:
-                        # Get embeddings for fact checks in the same language
-                        valid_fact_checks_indices = fact_checks_subset.index.map(lambda x: self.fact_checks.index.get_loc(x))
-                        valid_fact_checks_embeddings = fact_checks_embeddings[valid_fact_checks_indices]
-                else:
-                    valid_fact_checks_embeddings = fact_checks_embeddings
-                    valid_fact_checks_indices = np.arange(len(fact_checks_embeddings))
+                    
+                    try:
+                        similarities = cosine_similarity(post_embedding, valid_fact_checks_embeddings)
+                    except ValueError as e:
+                        logging.error(f"Dimension mismatch - Post embedding shape: {post_embedding.shape}, Fact check embeddings shape: {valid_fact_checks_embeddings.shape}")
+                        raise
+                    
+                    num_results = min(10, len(valid_fact_checks_indices))
+                    top_k_local_indices = np.argsort(-similarities[0])[:num_results]
+                    top_k_global_indices = valid_fact_checks_indices[top_k_local_indices]
+                    top_k_ids = [int(self.fact_checks.index[j]) for j in top_k_global_indices]
+                    
+                    all_top_10_ids.append(top_k_ids)
+                    all_similarities.append(similarities[0])
                 
-                # Calculate similarities
-                try:
-                    similarities = cosine_similarity(post_embedding, valid_fact_checks_embeddings)
-                except ValueError as e:
-                    logging.error(f"Dimension mismatch - Post embedding shape: {post_embedding.shape}, Fact check embeddings shape: {valid_fact_checks_embeddings.shape}")
-                    raise
-                
-                # Get top 10 indices (or less if not enough fact checks)
-                num_results = min(10, len(valid_fact_checks_indices))
-                top_k_local_indices = np.argsort(-similarities[0])[:num_results]
-                # Convert to global indices
-                top_k_global_indices = valid_fact_checks_indices[top_k_local_indices]
-                # Get fact check IDs
-                top_k_ids = [int(self.fact_checks.index[j]) for j in top_k_global_indices]
-                
-                all_top_10_ids.append(top_k_ids)
-                all_similarities.append(similarities[0])
+                logging.info("Finished computing similarities using original method")
             
-            # At the end, after generating predictions:
+            # Save predictions if needed
             if predictions_output_path and hasattr(self, 'post_ids_to_predict'):
                 self.save_predictions(posts_ids, all_top_10_ids, predictions_output_path)
             
