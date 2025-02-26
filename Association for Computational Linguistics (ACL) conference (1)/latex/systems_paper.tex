@@ -1,0 +1,449 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+
+\documentclass[11pt]{article}
+
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+\usepackage[review]{acl}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+%Including images in your LaTeX document requires adding
+%additional package(s)
+\usepackage{graphicx}
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+%\setlength\titlebox{<dim>}
+%
+% and set <dim> to something 5cm or larger.
+
+\title{Instructions for *ACL Proceedings 3}
+
+% Author information can be set in various styles:
+% For several authors from the same institution:
+% \author{Author 1 \and ... \and Author n \\
+%         Address line \\ ... \\ Address line}
+% if the names do not fit well on one line use
+%         Author 1 \\ {\bf Author 2} \\ ... \\ {\bf Author n} \\
+% For authors from different institutions:
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \And  ... \And
+%         Author n \\ Address line \\ ... \\ Address line}
+% To start a separate ``row'' of authors use \AND, as in
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \AND
+%         Author 2 \\ Address line \\ ... \\ Address line \And
+%         Author 3 \\ Address line \\ ... \\ Address line}
+
+\author{First Author \\
+  Affiliation / Address line 1 \\
+  Affiliation / Address line 2 \\
+  Affiliation / Address line 3 \\
+  \texttt{email@domain} \\\And
+  Second Author \\
+  Affiliation / Address line 1 \\
+  Affiliation / Address line 2 \\
+  Affiliation / Address line 3 \\
+  \texttt{email@domain} \\}
+
+%\author{
+%  \textbf{First Author\textsuperscript{1}},
+%  \textbf{Second Author\textsuperscript{1,2}},
+%  \textbf{Third T. Author\textsuperscript{1}},
+%  \textbf{Fourth Author\textsuperscript{1}},
+%\\
+%  \textbf{Fifth Author\textsuperscript{1,2}},
+%  \textbf{Sixth Author\textsuperscript{1}},
+%  \textbf{Seventh Author\textsuperscript{1}},
+%  \textbf{Eighth Author \textsuperscript{1,2,3,4}},
+%\\
+%  \textbf{Ninth Author\textsuperscript{1}},
+%  \textbf{Tenth Author\textsuperscript{1}},
+%  \textbf{Eleventh E. Author\textsuperscript{1,2,3,4,5}},
+%  \textbf{Twelfth Author\textsuperscript{1}},
+%\\
+%  \textbf{Thirteenth Author\textsuperscript{3}},
+%  \textbf{Fourteenth F. Author\textsuperscript{2,4}},
+%  \textbf{Fifteenth Author\textsuperscript{1}},
+%  \textbf{Sixteenth Author\textsuperscript{1}},
+%\\
+%  \textbf{Seventeenth S. Author\textsuperscript{4,5}},
+%  \textbf{Eighteenth Author\textsuperscript{3,4}},
+%  \textbf{Nineteenth N. Author\textsuperscript{2,5}},
+%  \textbf{Twentieth Author\textsuperscript{1}}
+%\\
+%\\
+%  \textsuperscript{1}Affiliation 1,
+%  \textsuperscript{2}Affiliation 2,
+%  \textsuperscript{3}Affiliation 3,
+%  \textsuperscript{4}Affiliation 4,
+%  \textsuperscript{5}Affiliation 5
+%\\
+%  \small{
+%    \textbf{Correspondence:} \href{mailto:email@domain}{email@domain}
+%  }
+%}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+This document is a supplement to the general instructions for *ACL authors. It contains instructions for using the \LaTeX{} style files for ACL conferences.
+The document itself conforms to its own specifications, and is therefore an example of what your manuscript should look like.
+These instructions should be used both for papers submitted for review and for final versions of accepted papers.
+\end{abstract}
+
+\section{Introduction}
+
+These instructions are for authors submitting papers to *ACL conferences using \LaTeX. For example, \citet{Gusfield:97} provides a comprehensive overview of string algorithms, while recent work by \citet{nogueira2019passage} demonstrates the application of modern language models. For parsing tasks, tools like those described in \citet{rasooli-tetrault-2015} can be particularly useful.
+
+\section{Background}
+
+To produce a PDF file, pdf\LaTeX{} is strongly recommended (over original \LaTeX{} plus dvips+ps2pdf or dvipdf).
+
+\section{System overview}
+
+El problema planteado era de una complejidad alta, ya que para cada post se tenia que hacer el retrieval de los fact checks mas relevantes, dentro de un universo de 200000 fact checks posibles.
+El sistema implementado fue una pipeline de retrieval con un modelo de embeddings de texto finetuneado.
+El modelo utilizado para el sistema fue uno finetuneado de intfloat/multilingual-e5-large-instruct. Este modelo fue finetuneado con el conjunto de datos de entrenamiento, junto con el prefijo de query y passage 'passage: ' y 'query: ', tal como recomiendan los autores del modelo en su paper. 
+Ninguna otra data ademas de la provista fue utilizada para el entrenamiento del modelo. 
+Una de las soluciones fue reducir el universo de fact checks a hacer el retrieval por idioma, de manera que si un post estaba escrito en un idioma particular, el sistema va a buscar los fact checks en el universo de fact checks de ese idioma, para que el modelo pueda hacer el retrieval de manera mas precisa.
+Para el retrieval se trajo los 10 fact checks mas similares a cada post de acuerdo a la similitud coseno de pearson entre el post y los fact checks.
+Fine-tuning contrastivo:
+The system implements a hybrid contrastive learning approach that combines elements of both weak and strong contrastive learning, specifically utilizing the Multiple Negatives Ranking Loss (MNRL) from the SentenceTransformers framework. Here are the key components:
+Loss Function:
+The system employs the Multiple Negatives Ranking Loss, which can be formulated as:
+L
+=
+−
+log
+⁡
+exp
+⁡
+(
+s
+i
+m
+(
+x
+i
+,
+x
+i
++
+)
+/
+τ
+)
+∑
+j
+=
+1
+N
+exp
+⁡
+(
+s
+i
+m
+(
+x
+i
+,
+x
+j
+)
+/
+τ
+)
+L=−log 
+∑ 
+j=1
+N
+​
+ exp(sim(x 
+i
+​
+ ,x 
+j
+​
+ )/τ)
+exp(sim(x 
+i
+​
+ ,x 
+i
++
+​
+ )/τ)
+​
+ 
+where:
+x
+i
+x 
+i
+​
+  is the anchor text embedding (post)
+x
+i
++
+x 
+i
++
+​
+  is the positive pair embedding (matching fact-check)
+x
+j
+x 
+j
+​
+  represents all other samples in the batch (negative pairs)
+τ
+τ is the temperature parameter
+s
+i
+m
+(
+⋅
+,
+⋅
+)
+sim(⋅,⋅) is the cosine similarity function
+
+This implementation uses in-batch negatives (weak contrastive learning).The approach is particularly well-suited for the fact-checking retrieval task due to its ability to learn fine-grained semantic similarities while maintaining computational efficiency.
+
+Embedding Space Engineering: The model architecture includes:
+A transformer encoder (base model: multilingual-e5-large-instruct)
+Mean pooling for sentence representation
+A dense layer for dimensional reduction and further semantic refinement
+Temperature Scaling: The system uses a temperature parameter (default 0.05) to control the sharpness of the probability distribution in the contrastive loss function, enabling more precise similarity distinctions.
+Multilingual Capability: The code supports training across multiple languages or for specific target languages, leveraging the cross-lingual capabilities of the underlying model.
+
+¿Cómo funciona durante el entrenamiento?
+Preparación de datos: El sistema solo recibe pares positivos (post + fact-check correspondiente)
+)
+       posts=posts_train,
+Generación implícita de negativos: La pérdida MultipleNegativesRankingLoss usa automáticamente otros ejemplos del mismo lote (batch) como negativos:
+Para cada post (ancla) en el batch
+Su fact-check correspondiente es el positivo
+Todos los demás fact-checks en el mismo batch son tratados como negativos
+Función de pérdida: Para cada par positivo (post, fact-check correcto), se compara su similitud contra la similitud con todos los otros fact-checks en el batch
+La fórmula matemática es:
+$$L = -\log \frac{\exp(sim(x_i, x_i^+)/\tau)}{\sum_{j=1}^{N} \exp(sim(x_i, x_j)/\tau)}$$
+Donde:
+$x_i$ es el embedding del post
+$x_i^+$ es el embedding del fact-check correcto
+$x_j$ son todos los embeddings en el batch
+$\tau$ es el parámetro de temperatura (0.05 en tu caso)
+
+Multiple Configurations
+The system can be configured for monolingual or cross-lingual tasks, with options to train separate models for each language or a single model for all languages.
+
+\section{Experimental setup}
+
+El dataset consiste en 3 corpus, correspondiente cada uno a una etapa de la competencia: Train, Dev y Test. 
+
+El conjunto de train fue a la vez dividido en train y val con una proporción 80-20 respectivamente. La columna de 'query' fue la concatenación de las columnas 'ocr' y 'text' para el archivo posts y la columna de 'passage' del archivo 'fact\_checks' fue la concatenación de las columnas 'claim' y 'title'.
+
+Los archivos fueron pre-procesados inicialmente con el codigo provisto por los organizadores en el archivo 'load.py'.  
+
+Para el entrenamiento e inferencia se uso sentence-transformers 3.4.1 y torch==2.5.1, la version de Python 3.12.7 bajo macOS 15.1 (24B83). 
+
+Como medida de evaluacion del sistema se utilizo la medida de evaluacion de la competencia, success at 10. 
+
+Como medidas de evaluacion de fine-tuning, se utilizo la similitud coseno entre pares positivos y negativos. 
+Como hiperparámetros del modelo se utilizó la siguiente configuración:
+\begin{itemize}
+    \item max\_seq\_length: int = 512
+    \item pooling\_mode: str = "mean"
+    \item embedding\_dim: int = 384
+    \item batch\_size: int = 4
+    \item eval\_batch\_size: int = 16
+    \item gradient\_accumulation\_steps: int = 2
+    \item num\_epochs: Optional[int] = None
+    \item temperature: float = 0.05
+    \item learning\_rate: float = 2e-5
+    \item use\_amp: bool = True
+\end{itemize}
+\section{Results}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{p{5cm}p{3cm}p{3cm}c}
+    \hline
+    \textbf{Model} & \textbf{Posts Prefix} & \textbf{Facts Prefix} & \textbf{Success@10 Multilingual} \\
+    \hline
+    multilingual-e5-large-instruct & passage: & query: & \textbf{0.838} \\
+    multilingual-e5-large-instruct & -- & Given a social media post query, retrieve relevant checked facts that answer the query: & 0.834 \\
+    multilingual-e5-large-instruct & -- & -- & 0.821 \\
+    multilingual-e5-small & -- & -- & 0.795 \\
+    e5-large-v2 & -- & -- & 0.758 \\
+    modernbert-embed-base & search\_query: & search\_document: & 0.779 \\
+    paraphrase-multilingual-mpnet-base-v2 & -- & -- & 0.736 \\
+    mxbai-embed-large-v1 & Represent this sentence for searching relevant passages: & -- & 0.665 \\
+    all-MiniLM-L12-v2 & -- & -- & 0.575 \\
+    \hline
+  \end{tabular}
+  \caption{Performance comparison of base models (without fine-tuning) on the validation set. Models are ordered by Success@10 score. Best result is shown in \textbf{bold}. Model names are shown without organization prefix for brevity (e.g., \texttt{intfloat/}, \texttt{sentence-transformers/}, etc.).}
+  \label{tab:base-models}
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{p{4.5cm}p{2cm}p{2cm}cc}
+    \hline
+    \textbf{Model} & \textbf{Posts Prefix} & \textbf{Facts Prefix} & \textbf{Multi S@10} & \textbf{Cross S@10} \\
+    \hline
+    multilingual-e5-large-instruct & \textbf{query:} & \textbf{passage:} & \textbf{0.871} & 0.728 \\
+    multilingual-e5-large-instruct & -- & -- & -- & 0.720 \\
+    multilingual-e5-large-instruct & post: & fact check: & -- & 0.726 \\
+    multilingual-e5-large-instruct & This is a post... & This is a fact... & -- & 0.732 \\
+    multilingual-e5-large-instruct & <[language]> & -- & -- & 0.722 \\
+    multilingual-e5-large-instruct & The following... & The following... & -- & 0.725 \\
+    multilingual-e5-large-instruct & This is a post... & This is a fact... & -- & 0.732 \\
+    \hline
+  \end{tabular}
+  \caption{Model performance with different input prefixes on validation set. Multi S@10 refers to Success@10 on the reduced validation set (pairs\_val.csv), while Cross S@10 shows cross-lingual validation performance on the complete validation set. Best configuration (query/passage) is shown in \textbf{bold}. Some prefixes are truncated for space; full prefixes are available in the appendix.}
+  \label{tab:model-results-base}
+\end{table*}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{p{4.5cm}p{2cm}p{2cm}cc}
+    \hline
+    \textbf{Model} & \textbf{Posts Prefix} & \textbf{Facts Prefix} & \textbf{Cross S@10} & \textbf{Multi S@10} \\
+    \hline
+    multilingual-e5-large-instruct & query: & passage: & 0.934 & \textbf{0.967} \\
+    multilingual-e5-large-instruct & -- & -- & 0.933 & -- \\
+    multilingual-e5-large-instruct & post: & fact check: & 0.934 & -- \\
+    multilingual-e5-large-instruct & This is a post... & This is a fact... & 0.936 & -- \\
+    multilingual-e5-large-instruct & <[language]> & -- & 0.933 & -- \\
+    multilingual-e5-large-instruct & The following... & The following... & 0.934 & -- \\
+    multilingual-e5-large-instruct & This is a post... & This is a fact... & \textbf{0.972} & -- \\
+    \hline
+  \end{tabular}
+  \caption{Fine-tuned model performance with different input prefixes. Cross S@10 shows performance on the complete validation set, while Reduced S@10 shows performance when searching only within the reduced set of fact checks for each post. Best results are shown in \textbf{bold}. Some prefixes are truncated for space; full prefixes are available in the appendix.}
+  \label{tab:model-results-finetuned}
+\end{table*}
+
+\subsection{Fine-tuned model results}
+
+
+De acuerdo a las metricas oficiales, el sistema tuvo una puntuacion de 0.867 de Avg. Esto lo posiciona en el lugar numero 20 dentro de 28 participantes que se ofrecieron a ser publicados en el tablero de resultados.
+Para la tarea monolingual, en total se probaron 11 combinaciones de prefijos y modelos. De las 11 combinaciones, 10 fueron configuraciones de modelos base y 1 fue una configuracion de modelo finetuneado.
+
+El modelo base intfloat/multilingual-e5-large-instruct paso de un Avg S@10 de 0.834 a 0.867 cuando se lo fine-tuneo con el conjunto de datos de entrenamiento, junto con el prefijo de query y passage 'passage: ' y 'query: ', tal como recomiendan los autores del modelo en su paper.
+Como se puede observar en la tabla del apendice, los resultados mejoran considerablemente cuando el corpus de fact checks se reduce. Los resultados en el apendice reflejan la performance de las distintas configuraciones para los fact checks que pertenecen a los posts del conjunto de entrenamiento, y los resultados de la tabla 1 y 2 de resultados pertenecen a la performance de las distintas configuraciones para los fact checks que pertenecen a los posts del conjunto de fact checks total.
+Por ejemplo, para un post dado del conjunto de entrenamiento, el score en la tabla del apendice refleja un sistema donde se tenia que hacer el retrieval de los fact checks mas probables dentro de un universo de 16000, comparado con 200000 donde el sistema tenia que hacer el retrieval del total de los fact checks, no solo del conjunto de entrenamiento.
+Los resultados oficiales entregados fueron realizados con el prefijo de query y passage 'passage: ' y 'query: '. 
+
+En el conjunto de val:
+Los resultados del modelo base, sin fine-tunear y con los mismos prefijos son los siguientes:
+0.834 Avg y por idioma: mean count language ara 0.847 541 deu 0.773 533 eng 0.788 3481 fra 0.896 1277 msa 0.822 849 por 0.799 2057 spa 0.869 4502 tha 0.925 372
+
+Si para el modelo utilizado como base no se le pasaran estos prefijos, recomendados por los creadores del modelo , los resultados son los siguientes:
+0.821 Avg. mean count language ara 0.830 541 deu 0.777 533 eng 0.766 3481 fra 0.895 1277 msa 0.817 849 por 0.781 2057 spa 0.857 4502 tha 0.930 372
+
+Como se puede observar, la performance en S@10 se reduce en 0.013 unicamente por el uso de prefijos.
+
+Insertar el resto de resultados
+
+\section{Bib\TeX{} Files}
+\label{sec:bibtex}
+
+Unicode cannot be used in Bib\TeX{} entries, and some ways of typing special characters can disrupt Bib\TeX's alphabetization. The recommended way of typing special characters is shown in Table~\ref{tab:accents}.
+
+Please ensure that Bib\TeX{} records contain DOIs or URLs when possible, and for all the ACL materials that you reference.
+Use the \verb|doi| field for DOIs and the \verb|url| field for URLs.
+If a Bib\TeX{} entry has a URL or DOI field, the paper title in the references section will appear as a hyperlink to the paper, using the hyperref \LaTeX{} package.
+
+\section*{Conclusion}
+
+Since December 2023, a "Limitations" section has been required for all papers submitted to ACL Rolling Review (ARR). This section should be placed at the end of the paper, before the references. The "Limitations" section (along with, optionally, a section for ethical considerations) may be up to one page and will not count toward the final page limit. Note that these files may be used by venues that do not rely on ARR so it is recommended to verify the requirement of a "Limitations" section and other criteria with the venue in question.
+
+\section*{Acknowledgments}
+
+This document has been adapted
+by Steven Bethard, Ryan Cotterell and Rui Yan
+from the instructions for earlier ACL and NAACL proceedings, including those for
+ACL 2019 by Douwe Kiela and Ivan Vuli\'{c},
+NAACL 2019 by Stephanie Lukin and Alla Roskovskaya,
+ACL 2018 by Shay Cohen, Kevin Gimpel, and Wei Lu,
+NAACL 2018 by Margaret Mitchell and Stephanie Lukin,
+Bib\TeX{} suggestions for (NA)ACL 2017/2018 from Jason Eisner,
+ACL 2017 by Dan Gildea and Min-Yen Kan,
+NAACL 2017 by Margaret Mitchell,
+ACL 2012 by Maggie Li and Michael White,
+ACL 2010 by Jing-Shin Chang and Philipp Koehn,
+ACL 2008 by Johanna D. Moore, Simone Teufel, James Allan, and Sadaoki Furui,
+ACL 2005 by Hwee Tou Ng and Kemal Oflazer,
+ACL 2002 by Eugene Charniak and Dekang Lin,
+and earlier ACL and EACL formats written by several people, including
+John Chen, Henry S. Thompson and Donald Walker.
+Additional elements were taken from the formatting instructions of the \emph{International Joint Conference on Artificial Intelligence} and the \emph{Conference on Computer Vision and Pattern Recognition}.
+
+% Bibliography entries for the entire Anthology, followed by custom entries
+%\bibliography{anthology,custom}
+% Custom bibliography entries only
+\bibliography{custom}
+
+\appendix
+
+\section{Detailed Results by Language}
+\label{sec:appendix-results}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{lcc}
+    \hline
+    \textbf{Language} & \textbf{Success@10} & \textbf{Test Set Size} \\
+    \hline
+    Malaysian (msa) & \textbf{0.978} & -- \\
+    Thai (tha) & 0.940 & -- \\
+    Arabic (ara) & 0.912 & -- \\
+    French (fra) & 0.894 & -- \\
+    Spanish (spa) & 0.866 & -- \\
+    German (deu) & 0.858 & -- \\
+    Turkish (tur) & 0.828 & -- \\
+    Polish (pol) & 0.806 & -- \\
+    English (eng) & 0.796 & -- \\
+    Portuguese (por) & 0.796 & -- \\
+    \hline
+    Average & 0.867 & -- \\
+    \hline
+  \end{tabular}
+  \caption{Official test set results of the fine-tuned multilingual-e5-large-instruct model by language. Languages are ordered by Success@10 score. Best performance is shown in \textbf{bold}. The model shows strong cross-lingual generalization, with particularly strong performance on Malaysian and Thai.}
+  \label{tab:test-results-by-language}
+\end{table*}
+
+This appendix presents the detailed performance breakdown of our fine-tuned model across different languages in the official test set. As shown in Table~\ref{tab:test-results-by-language}, the model achieves consistent performance across diverse language families, from Indo-European (English, French, German) to Austronesian (Malaysian) and Tai-Kadai (Thai) languages.
+
+\end{document}

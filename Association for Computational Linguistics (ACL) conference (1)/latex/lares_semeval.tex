@@ -1,0 +1,343 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+
+\documentclass[11pt]{article}
+
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+\usepackage[review]{acl}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+%Including images in your LaTeX document requires adding
+%additional package(s)
+\usepackage{graphicx}
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+%\setlength\titlebox{<dim>}
+%
+% and set <dim> to something 5cm or larger.
+
+\title{SemEval System Papers}
+\author{Santiago Lares Harbin \\
+  Universidad de San Andres \\
+  \texttt{santiago.lares@udesa.edu.ar} \\\And
+  Team: Shouth NLP \\
+  \texttt{team@shouthnlp.com} \\}
+\date{Santiago Lares Harbin \\ Universidad de San Andres \\ \texttt{santiago.lares@udesa.edu.ar} \\ Team: Shouth NLP \\ \texttt{team@shouthnlp.com}}
+
+
+\author{Santiago Lares Harbin \\
+  Universidad de San Andres \\
+  \texttt{santiago.lares@udesa.edu.ar} \\\And
+  Team: Shouth NLP \\
+  \texttt{team@shouthnlp.com} \\}
+
+%\author{
+%  \textbf{First Author\textsuperscript{1}},
+%  \textbf{Second Author\textsuperscript{1,2}},
+%  \textbf{Third T. Author\textsuperscript{1}},
+%  \textbf{Fourth Author\textsuperscript{1}},
+%\\
+%  \textbf{Fifth Author\textsuperscript{1,2}},
+%  \textbf{Sixth Author\textsuperscript{1}},
+%  \textbf{Seventh Author\textsuperscript{1}},
+%  \textbf{Eighth Author \textsuperscript{1,2,3,4}},
+%\\
+%  \textbf{Ninth Author\textsuperscript{1}},
+%  \textbf{Tenth Author\textsuperscript{1}},
+%  \textbf{Eleventh E. Author\textsuperscript{1,2,3,4,5}},
+%  \textbf{Twelfth Author\textsuperscript{1}},
+%\\
+%  \textbf{Thirteenth Author\textsuperscript{3}},
+%  \textbf{Fourteenth F. Author\textsuperscript{2,4}},
+%  \textbf{Fifteenth Author\textsuperscript{1}},
+%  \textbf{Sixteenth Author\textsuperscript{1}},
+%\\
+%  \textbf{Seventeenth S. Author\textsuperscript{4,5}},
+%  \textbf{Eighteenth Author\textsuperscript{3,4}},
+%  \textbf{Nineteenth N. Author\textsuperscript{2,5}},
+%  \textbf{Twentieth Author\textsuperscript{1}}
+%\\
+%\\
+%  \textsuperscript{1}Affiliation 1,
+%  \textsuperscript{2}Affiliation 2,
+%  \textsuperscript{3}Affiliation 3,
+%  \textsuperscript{4}Affiliation 4,
+%  \textsuperscript{5}Affiliation 5
+%\\
+%  \small{
+%    \textbf{Correspondence:} \href{mailto:email@domain}{email@domain}
+%  }
+%}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+Abstract
+\end{abstract}
+
+\section{Introduction}
+
+Introduction
+
+\cite{Gusfield:97}
+
+\section{Background}
+
+Background
+
+\section{System Overview}
+
+Our system addresses the challenge of retrieving relevant fact checks from a large corpus of 200,000 documents by implementing a fine-tuned contrastive learning approach based on the multilingual E5 model architecture. The system consists of three main components: (1) a text embedding model, (2) a contrastive learning framework, and (3) a retrieval pipeline.
+
+\subsection{Model Architecture}
+
+The core of our system is built upon the `intfloat/multilingual-e5-large-instruct` model, which we enhance with a custom architecture designed specifically for fact-checking retrieval. The model consists of:
+
+\begin{itemize}
+    \item A transformer encoder (base E5 model)
+    \item A mean pooling layer for sentence representation
+    \item A dense projection layer with GELU activation
+    \item L2 normalization for cosine similarity optimization
+\end{itemize}
+
+The model processes both posts and fact checks using language-specific prefixes ('query:' and 'passage:' respectively) to optimize the semantic matching between them.
+
+\subsection{Contrastive Learning Framework}
+
+We implement a contrastive learning approach using the Multiple Negatives Ranking Loss (MNRL), which can be formulated as:
+
+\begin{equation}
+L = -\log \frac{\exp(sim(x_i, x_i^+)/\tau)}{\sum_{j=1}^{N} \exp(sim(x_i, x_j)/\tau)}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $x_i$ represents the anchor text embedding (post)
+    \item $x_i^+$ represents the positive pair embedding (matching fact-check)
+    \item $x_j$ represents all other samples in the batch (negative pairs)
+    \item $\tau$ is a temperature parameter that controls the sharpness of the distribution
+    \item $sim(\cdot,\cdot)$ is the cosine similarity function
+\end{itemize}
+
+The framework employs in-batch negatives for computational efficiency while maintaining effective contrastive learning. The temperature parameter $\tau$ is dynamically adjusted during training to optimize the learning process.
+
+\subsection{Retrieval Pipeline}
+
+The retrieval process follows these steps:
+
+\begin{enumerate}
+    \item \textbf{Language Detection}: The system first identifies the language of the input post.
+    \item \textbf{Corpus Filtering}: The fact-check corpus is filtered to prioritize documents in the same language as the input post.
+    \item \textbf{Embedding Generation}: The model generates embeddings for both the input post and the filtered fact checks.
+    \item \textbf{Similarity Ranking}: The system computes Pearson cosine similarity between the post and fact check embeddings.
+    \item \textbf{Top-K Selection}: The 10 most similar fact checks are retrieved and ranked.
+\end{enumerate}
+
+This pipeline is optimized for both monolingual and cross-lingual retrieval, with special consideration for language-specific nuances in the embedding space.
+
+\section{Experimental Setup}
+
+\subsection{Dataset}
+
+The experimental data consists of three main components:
+\begin{itemize}
+    \item \textbf{Posts}: Social media posts in multiple languages requiring fact-checking
+    \item \textbf{Fact Checks}: A corpus of 153,743 fact-checks across 8 languages (Arabic, German, English, French, Malaysian, Portuguese, Spanish, and Thai)
+    \item \textbf{Training Pairs}: Annotated pairs of posts and their corresponding relevant fact-checks
+\end{itemize}
+
+We split the training data into training (80\%) and validation (20\%) sets while maintaining the language distribution. For each post, we concatenated the OCR-extracted text and manual transcription to create a comprehensive text representation. Similarly, for fact checks, we combined the claim and title fields to create rich semantic representations.
+
+\subsection{Implementation Details}
+
+The system was implemented using the following configuration:
+
+\begin{itemize}
+    \item \textbf{Base Model}: multilingual-e5-large-instruct
+    \item \textbf{Framework}: SentenceTransformers (v3.4.1)
+    \item \textbf{Deep Learning Backend}: PyTorch (v2.5.1)
+    \item \textbf{Python Version}: 3.12.7
+    \item \textbf{Computing Environment}: macOS 15.1 (24B83)
+\end{itemize}
+
+\subsection{Training Configuration}
+
+The model was trained with the following hyperparameters:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{ll}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Maximum Sequence Length & 512 tokens \\
+Pooling Mode & Mean \\
+Embedding Dimension & 384 \\
+Batch Size & 4 \\
+Evaluation Batch Size & 16 \\
+Gradient Accumulation Steps & 2 \\
+Learning Rate & 2e-5 \\
+Temperature & 0.05 \\
+Mixed Precision Training & Enabled \\
+\hline
+\end{tabular}
+\caption{Model training hyperparameters}
+\label{tab:hyperparams}
+\end{table}
+
+\subsection{Evaluation Metrics}
+
+The primary evaluation metric for our system was Success@10 (S@10), which measures the proportion of posts for which the correct fact check appears in the top 10 retrieved results. We evaluated the model's performance in both monolingual and cross-lingual settings:
+
+\begin{itemize}
+    \item \textbf{Monolingual}: Retrieval within the same language
+    \item \textbf{Cross-lingual}: Retrieval across different languages
+\end{itemize}
+
+During training, we also monitored:
+\begin{itemize}
+    \item Cosine similarity between positive pairs
+    \item Cosine similarity between negative pairs
+    \item Training loss convergence
+    \item Validation performance at regular intervals
+\end{itemize}
+
+\section{Results}
+
+We evaluate our system's performance on both the validation and test sets, analyzing the impact of different model configurations and language-specific performance. Our system achieved an average Success@10 score of 0.867 on the official test set, ranking 20th out of 28 published participants.
+
+\subsection{Model Configuration Analysis}
+
+Table~\ref{tab:base-models} shows the performance comparison of different base models and input prefix configurations on the validation set. The results demonstrate that the multilingual-e5-large-instruct model with appropriate prefixes consistently outperforms other configurations.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{p{5cm}p{3cm}p{3cm}c}
+    \hline
+    \textbf{Model} & \textbf{Posts Prefix} & \textbf{Facts Prefix} & \textbf{Success@10} \\
+    \hline
+    multilingual-e5-large-instruct & passage: & query: & \textbf{0.834} \\
+    multilingual-e5-large-instruct & -- & -- & 0.821 \\
+    multilingual-e5-small & -- & -- & 0.795 \\
+    e5-large-v2 & -- & -- & 0.758 \\
+    modernbert-embed-base & search\_query: & search\_document: & 0.779 \\
+    paraphrase-multilingual-mpnet-base-v2 & -- & -- & 0.736 \\
+    \hline
+  \end{tabular}
+  \caption{Performance comparison of base models on the validation set. Models are ordered by Success@10 score. Best result is shown in \textbf{bold}.}
+  \label{tab:base-models}
+\end{table*}
+
+\subsection{Language-Specific Performance}
+
+Table~\ref{tab:lang-performance} presents the detailed performance breakdown by language on the validation set, showing significant variation across different languages.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{lccc}
+    \hline
+    \textbf{Language} & \textbf{Success@10} & \textbf{Sample Count} & \textbf{Relative Performance} \\
+    \hline
+    Thai (tha) & \textbf{0.930} & 372 & +10.9\% \\
+    French (fra) & 0.895 & 1,277 & +7.4\% \\
+    Spanish (spa) & 0.857 & 4,502 & +3.6\% \\
+    Arabic (ara) & 0.830 & 541 & +0.9\% \\
+    Malaysian (msa) & 0.817 & 849 & -0.4\% \\
+    German (deu) & 0.777 & 533 & -4.4\% \\
+    Portuguese (por) & 0.781 & 2,057 & -4.0\% \\
+    English (eng) & 0.766 & 3,481 & -5.5\% \\
+    \hline
+    \textbf{Average} & 0.821 & 13,612 & -- \\
+    \hline
+  \end{tabular}
+  \caption{Language-specific performance on the validation set. Relative Performance shows the percentage difference from the average Success@10 score. Best performance is shown in \textbf{bold}.}
+  \label{tab:lang-performance}
+\end{table*}
+
+\subsection{Impact of Input Prefixes}
+
+Our experiments revealed that the choice of input prefixes significantly impacts model performance. Using the recommended prefixes ('passage:' and 'query:') improved the average Success@10 score by 0.013 points (from 0.821 to 0.834) compared to using no prefixes. This improvement was consistent across all languages, with the largest gains observed in:
+
+\begin{itemize}
+    \item English: +0.022 (from 0.766 to 0.788)
+    \item Spanish: +0.012 (from 0.857 to 0.869)
+    \item Portuguese: +0.018 (from 0.781 to 0.799)
+\end{itemize}
+
+These results suggest that appropriate input formatting plays a crucial role in optimizing the model's cross-lingual understanding and retrieval capabilities.
+
+\section{Conclusion}
+
+Conclusion
+
+
+\section{Acknowledgments}
+
+Acknowledgments
+
+% Bibliography entries for the entire Anthology, followed by custom entries
+%\bibliography{anthology,custom}
+% Custom bibliography entries only
+\bibliography{custom}
+
+\appendix
+
+\section{Detailed Results by Language}
+\label{sec:appendix-results}
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{lcc}
+    \hline
+    \textbf{Language} & \textbf{Success@10} & \textbf{Test Set Size} \\
+    \hline
+    Malaysian (msa) & \textbf{0.978} & -- \\
+    Thai (tha) & 0.940 & -- \\
+    Arabic (ara) & 0.912 & -- \\
+    French (fra) & 0.894 & -- \\
+    Spanish (spa) & 0.866 & -- \\
+    German (deu) & 0.858 & -- \\
+    Turkish (tur) & 0.828 & -- \\
+    Polish (pol) & 0.806 & -- \\
+    English (eng) & 0.796 & -- \\
+    Portuguese (por) & 0.796 & -- \\
+    \hline
+    Average & 0.867 & -- \\
+    \hline
+  \end{tabular}
+  \caption{Official test set results of the fine-tuned multilingual-e5-large-instruct model by language. Languages are ordered by Success@10 score. Best performance is shown in \textbf{bold}. The model shows strong cross-lingual generalization, with particularly strong performance on Malaysian and Thai.}
+  \label{tab:test-results-by-language}
+\end{table*}
+
+This appendix presents the detailed performance breakdown of our fine-tuned model across different languages in the official test set. As shown in Table~\ref{tab:test-results-by-language}, the model achieves consistent performance across diverse language families, from Indo-European (English, French, German) to Austronesian (Malaysian) and Tai-Kadai (Thai) languages.
+
+\end{document}
