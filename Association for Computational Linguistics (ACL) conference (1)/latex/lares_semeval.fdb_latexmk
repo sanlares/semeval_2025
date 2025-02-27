@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex lares_semeval"] 1740540249.36051 "lares_semeval.aux" "lares_semeval.bbl" "lares_semeval" 1740540585.35603 0
+["bibtex lares_semeval"] 1740540249.36051 "lares_semeval.aux" "lares_semeval.bbl" "lares_semeval" 1740615075.65587 0
   "./acl_natbib.bst" 1740455722 44731 623164d2ae4d5e9ba5d48ec6ad689499 ""
   "./custom.bib" 1740455722 2251 c25a62e45e73a84cbe01f3e1c594285a ""
-  "lares_semeval.aux" 1740540585.08416 6753 7f991ba9c2ba289101abff1d05d0ba06 "pdflatex"
+  "lares_semeval.aux" 1740615075.25453 6753 7f991ba9c2ba289101abff1d05d0ba06 "pdflatex"
   (generated)
   "lares_semeval.bbl"
   "lares_semeval.blg"
   (rewritten before read)
-["pdflatex"] 1740540584.33013 "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval.tex" "lares_semeval.pdf" "lares_semeval" 1740540585.35619 0
-  "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval.tex" 1740540584.11038 13714 18c902a4eb7a7d1b4ac95ded819cedd6 ""
+["pdflatex"] 1740615074.29731 "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval.tex" "lares_semeval.pdf" "lares_semeval" 1740615075.65605 0
+  "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval.tex" 1740615072.29915 13714 2566c2cb3228ad16d17947db79f60fe6 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/helvetic/phvb.tfm" 1136768653 2300 14616918391efa49ac8b481a75fbdc1a ""
@@ -127,10 +127,10 @@
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1740436396 8221424 dfad4c67b2e77426ca62e8f3f59eecb2 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "acl.sty" 1740455722 11597 da9a94cfb2d73b4ccce758d297ef675a ""
-  "lares_semeval.aux" 1740540585.08416 6753 7f991ba9c2ba289101abff1d05d0ba06 "pdflatex"
+  "lares_semeval.aux" 1740615075.25453 6753 7f991ba9c2ba289101abff1d05d0ba06 "pdflatex"
   "lares_semeval.bbl" 1740540249.48452 259 ce04ff4121719c9b92f468d4d3495fe1 "bibtex lares_semeval"
-  "lares_semeval.out" 1740540585.08495 2633 b890e2c901ef23c415b80895b175beb7 "pdflatex"
-  "lares_semeval.tex" 1740540584.11038 13714 18c902a4eb7a7d1b4ac95ded819cedd6 ""
+  "lares_semeval.out" 1740615075.25533 2633 b890e2c901ef23c415b80895b175beb7 "pdflatex"
+  "lares_semeval.tex" 1740615072.29915 13714 2566c2cb3228ad16d17947db79f60fe6 ""
   (generated)
   "lares_semeval.aux"
   "lares_semeval.log"
