@@ -21,3 +21,13 @@ models/
 .DS_Store
 models/
 wandb/
+*.aux
+*.log
+*.toc
+*.dvi
+*.ps
+*.fdb_latexmk
+*.blg
+*.bbl
+*.out
+*.fls
