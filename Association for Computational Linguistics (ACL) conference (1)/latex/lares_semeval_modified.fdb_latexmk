@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex lares_semeval_modified"] 1740707098.56834 "lares_semeval_modified.aux" "lares_semeval_modified.bbl" "lares_semeval_modified" 1740707099.68014 0
+["bibtex lares_semeval_modified"] 1740707098.56834 "lares_semeval_modified.aux" "lares_semeval_modified.bbl" "lares_semeval_modified" 1740748533.80994 0
   "./acl_natbib.bst" 1740455722 44731 623164d2ae4d5e9ba5d48ec6ad689499 ""
   "./custom.bib" 1740701568.29439 5323 33ba66b3e041093931b6c720d1518d6d ""
-  "lares_semeval_modified.aux" 1740707099.38686 6266 e7a8e91aa1605bb55ca646cd4219cfde "pdflatex"
+  "lares_semeval_modified.aux" 1740748533.52386 6266 e7a8e91aa1605bb55ca646cd4219cfde "pdflatex"
   (generated)
   "lares_semeval_modified.bbl"
   "lares_semeval_modified.blg"
   (rewritten before read)
-["pdflatex"] 1740707098.69347 "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval_modified.tex" "lares_semeval_modified.pdf" "lares_semeval_modified" 1740707099.68027 0
-  "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval_modified.tex" 1740707097.19988 19342 2091a949aa3399ae86cd0c8f3e7fec20 ""
+["pdflatex"] 1740748532.72659 "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval_modified.tex" "lares_semeval_modified.pdf" "lares_semeval_modified" 1740748533.81011 0
+  "/Users/santiagolares/Projects/semeval_2025/Association for Computational Linguistics (ACL) conference (1)/latex/lares_semeval_modified.tex" 1740748532.46357 19343 214003b57875036012bb16b8b653bf48 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/inconsolata/i4-t1-0.enc" 1558214095 7631 5169ff1acd97ff1c4ab83563c99f96f4 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -126,10 +126,10 @@
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1740436396 8221424 dfad4c67b2e77426ca62e8f3f59eecb2 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "acl.sty" 1740455722 11597 da9a94cfb2d73b4ccce758d297ef675a ""
-  "lares_semeval_modified.aux" 1740707099.38686 6266 e7a8e91aa1605bb55ca646cd4219cfde "pdflatex"
-  "lares_semeval_modified.bbl" 1740707098.69104 2677 e40b2e2e051c4f07d9e1b86e6f6907b5 "bibtex lares_semeval_modified"
-  "lares_semeval_modified.out" 1740707099.38757 3129 b86bd88ef77624b1b2e554fe1c630c7f "pdflatex"
-  "lares_semeval_modified.tex" 1740707097.19988 19342 2091a949aa3399ae86cd0c8f3e7fec20 ""
+  "lares_semeval_modified.aux" 1740748533.52386 6266 e7a8e91aa1605bb55ca646cd4219cfde "pdflatex"
+  "lares_semeval_modified.bbl" 1740707103.71181 2715 226755b639badf03f7a9f53d77cd8040 "bibtex lares_semeval_modified"
+  "lares_semeval_modified.out" 1740748533.5246 3129 b86bd88ef77624b1b2e554fe1c630c7f "pdflatex"
+  "lares_semeval_modified.tex" 1740748532.46357 19343 214003b57875036012bb16b8b653bf48 ""
   (generated)
   "lares_semeval_modified.aux"
   "lares_semeval_modified.log"
