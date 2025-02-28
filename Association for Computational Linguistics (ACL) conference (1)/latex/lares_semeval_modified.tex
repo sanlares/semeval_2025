@@ -43,29 +43,65 @@
 
 \title{Shouth NLP at SemEval-2025 Task 3: Multilingual Fact-Checking Retrieval Using Contrastive Learning}
 \author{}
-\author{Shouth NLP Team \\
-Santiago Lares Harbin \\
+\author{Santiago Lares Harbin \\
   Universidad de San Andres \\
   \texttt{slaresharbin@udesa.edu.ar}}
 
 \begin{document}
 \maketitle
 \begin{abstract}
-We present a multilingual fact-checking retrieval system for the SemEval-2025 task of matching social media posts with relevant fact checks. Our approach utilizes a contrastive learning framework built on the multilingual E5 model architecture, fine-tuned on the provided dataset. The system achieves a Success@10 score of 0.867 on the official test set, with notable performance variations between languages. We demonstrate that appropriate input prefixes and language-specific corpus filtering significantly improve retrieval performance. Our analysis reveals interesting patterns in cross-lingual transfer, with specifically strong results on Malaysian and Thai languages. The paper presents detailed experiments comparing different model architectures, input formatting strategies, and their impact on multilingual retrieval performance.
+We present a multilingual fact-checking retrieval system for the SemEval-2025 task of matching social media posts with relevant fact checks. Our approach is based on a fine-tuned multilingual E5 model and in the experimentation with several prefixes and language-specific corpus filtering. The system achieves a Success@10 score of $0.867$ on the official test set, although with a big variance between languages. Our analysis discover interesting patterns in cross-lingual transfer, with strong results on Malaysian and Thai languages. We make our code public for further research and development.
 \end{abstract}
 
 \section{Introduction}
 
-The proliferation of misinformation on social media has created an urgent need for automated fact-checking systems that can efficiently retrieve relevant fact-checks for dubious claims. The SemEval-2025 Task \cite{sebi2025multilingual} addresses this challenge by requiring participants to develop systems that can retrieve the most relevant fact checks for social media posts from a large corpus of 272,447 fact checks among multiple languages.
 
-In this paper, we present our approach to this task, which utilizes a fine-tuned multilingual embedding model based on the E5 architecture \cite{wang2024multilingual}. Our system employs a contrastive learning framework to optimize the semantic matching between posts and fact checks. We focus in particular on effective multilingual representation learning and cross-lingual retrieval functions. The code for our system is publicly available on GitHub\footnote{\url{https://github.com/sanlares/semeval_2025}}.
 
-Our main contributions include: (1) an analysis of various model architectures and their performance among different languages, (2) an examination of how input prefixes affect retrieval accuracy, and (3) a demonstration of the importance of language-specific corpus filtering for improving retrieval performance. Our system achieved an average Success@10 score of 0.867 on the official test set, ranking 20th out of 28 published participants.
+The proliferation of misinformation on social media has created an urgent need for automated fact-checking systems that can efficiently detect and verify false claims, given the immense volume of information shared online \cite{zhou2020fakenews}. Most automated fact-checking system consist of three steps \cite{guo2022survey}: first, the claim detection (is this check-worthy?); then, the evidence retrieval (given a claim, retrieve relevant information to verify it); and lastly and claim verification (given a claim and evidence, define if the claim is true or false). The SemEval-2025 Task \cite{sebi2025multilingual} addresses the second of these steps by requiring participants to develop evidence-retrieval systems for social media posts, out of a large corpus of $272,447$ fact checks among multiple languages.
+
+In this paper, we present our approach to this task, which uses a fine-tuned multilingual embedding model based on the E5 architecture \cite{wang2024multilingual}. Our system employs a contrastive learning framework to optimize the semantic matching between posts and fact checks. We focus in particular on effective multilingual representation learning and cross-lingual retrieval functions. The code for our system is publicly available on GitHub\footnote{\url{https://github.com/sanlares/semeval_2025}}.
+
+Our contributions are the following:
+\begin{itemize}
+  \item an analysis of various model architectures and their performance among different languages
+  \item an experimentation of how input prefixes affect retrieval accuracy
+  \item an exloration of the importance of language-specific corpus filtering
+\end{itemize}
+
+Our system achieved an average Success@10 score of 0.867 on the official test set, ranking 20th out of 28 published participants.
 
 \section{Background}
+%
+% % Acá tenés que citar más papers...
+% % Te tiro un párrafo de un texto no publicado, fijate si lo podés reutilizar acá
+%
+% %La tarea de fact-checking consiste en evaluar la veracidad de afirmaciones, como por ejemplo “La pobreza en Argentina es del 50%”. Algunos sitios como Snopes, Chequeado, y Full Fact dedican muchísimo esfuerzo humano a esta tarea, tanto en el contexto de afirmaciones de políticos como de desarmar noticias falsas o fake news [1]. Recientemente, y en concordancia con el avance del PLN, ha tenido lugar una creciente atención a la posibilidad de automatizar esta tarea. La automatización del fact-checking puede descomponerse en la concatenación de tres subtareas [16]: (i) la detección de afirmaciones; (ii) la recuperación de evidencia; y (iii) el veredicto sobre la afirmación. La detección de afirmaciones se basa también en evaluar la importancia de la aseveración y si es digna de ser evaluada (check-worthiness) y está relacionada a otras tareas como la detección de rumores [16]. La detección automática de fake news ha estado dominada hasta el momento por cuestiones de estilo de escritura y otros datos no factuales [1] mientras el fact-checking, en cambio, permanece como un caso elusivo a las actuales técnicas de LLMs. Si bien hay múltiples conjuntos de datos para las distintas etapas de fact-checking, mayormente están construidos en inglés. Podemos entre ellos mencionar a CheckThat21 [19] y las distintas versiones de FEVER [9], donde sólo el primero de estos tiene una porción de sus datos en español.
+%
+% [1] Zhou, X., & Zafarani, R. (2020). A survey of fake news: Fundamental theories, detection methods, and opportunities. ACM Computing Surveys (CSUR), 53(5), 1-40.
+% [2] Zhang, Z., Han, X., Liu, Z., Jiang, X., Sun, M., & Liu, Q. (2019, July). ERNIE: Enhanced Language Representation with Informative Entities. In Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (pp. 1441-1451).
+% [3] Wang, X., Gao, T., Zhu, Z., Zhang, Z., Liu, Z., Li, J., & Tang, J. (2021). KEPLER: A unified model for knowledge embedding and pre-trained language representation. Transactions of the Association for Computational Linguistics, 9, 176-194.
+% [4] Pérez, J. M., Furman, D. A., Alemany, L. A., & Luque, F. (2021). RoBERTuito: a pre-trained language model for social media text in Spanish. arXiv preprint arXiv:2111.09453. Enviado a LREC 2022
+% [5] Liu, W., Zhou, P., Zhao, Z., Wang, Z., Ju, Q., Deng, H., & Wang, P. (2020, April). K-bert: Enabling language representation with knowledge graph. In Proceedings of the AAAI Conference on Artificial Intelligence (Vol. 34, No. 03, pp. 2901-2908).
+% [6] Arango, A., Pérez, J., & Poblete, B. (2019, July). Hate speech detection is not as easy as you may think: A closer look at model validation. In Proceedings of the 42nd international ACM SIGIR conference on research and development in information retrieval.
+% [7] Devlin, J., Chang, M. W., Lee, K., & Toutanova, K. (2019, June). BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding. In Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers) (pp. 4171-4186).
+% [8] Bordes, A., Usunier, N., Garcia-Duran, A., Weston, J., & Yakhnenko, O. (2013). Translating embeddings for modeling multi-relational data. Advances in neural information processing systems, 26.
+% [9] Aly, R., Guo, Z., Schlichtkrull., et al (2021, June). FEVEROUS: Fact Extraction and VERification Over Unstructured and Structured information. In Thirty-fifth Conference on Neural Information Processing Systems Datasets and Benchmarks Track (Round 1).
+% [10] Logan, R., Liu, N. F., Peters, M. E., Gardner, M., & Singh, S. (2019, July). Barack’s Wife Hillary: Using Knowledge Graphs for Fact-Aware Language Modeling. In Annual Meeting of the Association for Computational Linguistics (ACL).
+% [11] Bender, E. M., Gebru, T., McMillan-Major, A., & Shmitchell, S. (2021, March). On the Dangers of Stochastic Parrots: Can Language Models Be Too Big?. In Proceedings of the 2021 ACM Conference on Fairness, Accountability, and Transparency (pp. 610-623).
+% [12] Poletto, F., Basile, V., Sanguinetti, M., Bosco, C., & Patti, V. (2021). Resources and benchmark corpora for hate speech detection: a systematic review. Language Resources and Evaluation, 55(2), 477-523.
+% [13] Chung, Y. L., Kuzmenko, E., Tekiroğlu, S. S., & Guerini, M. (2019, July). CONAN-COunter NArratives through Nichesourcing: a Multilingual Dataset of Responses to Fight Online Hate Speech. In Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics (pp. 2819-2829).
+% [14] Damián A. Furman, Pablo E. Torres, José A. Rodríguez, Laura Alonso Alemany, Diego Letzen, Maria Vanina Martinez. Parsimonious Argument Annotations for Hate Speech Counter-narratives. Enviado a LREC 2022
+% [15] Alex Wang, Amanpreet Singh, Julian Michael, Felix Hill, Omer Levy, and Samuel Bowman. GLUE: A multi-task benchmark and analysis platform for NLU. In Proceedings of the 2018 EMNLP Workshop BlackboxNLP: Analyzing and Interpreting Neural Networks for NLP, pages 353–355, Brussels, Belgium, November 2018
+% [16] Guo, Z., Schlichtkrull, M., & Vlachos, A. (2022). A survey on automated fact-checking. TACL, 10, 178-206.
+% [17] Lundberg, S. M., & Lee, S. I. (2017). A unified approach to interpreting model predictions. NIPS, 30.
+% [18] Choi, E., Levy, O., Choi, Y., & Zettlemoyer, L. (2018, July). Ultra-Fine Entity Typing. In Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) (pp. 87-96).
+% [19] Nakov, P., Da San Martino, G., Elsayed, T., Barrón-Cedeno, A., Míguez, R., Shaar, S., ... & Mandl, T. (2021, March). The CLEF-2021 CheckThat! lab on detecting check-worthy claims, previously fact-checked claims, and fake news. In European Conference on Information Retrieval (pp. 639-649). Springer, Cham.
+% [20] Schmidt, A., & Wiegand, M. (2019, January). A survey on hate speech detection using natural language processing. In Proceedings of the Fifth International Workshop on Natural Language Processing for Social Media, 2017, Valencia, Spain (pp. 1-10).
+%
 
 Automated fact-checking has emerged as a critical tool in combating the spread of misinformation online. The SemEval-2025 task focuses especially on multilingual fact-check retrieval, where the goal is to match social media posts with relevant fact-checks from a large multilingual corpus.
 
+% Convertir a itemize
 The task involves two main challenges: (1) semantic matching between posts and fact checks, which may be expressed differently despite covering the same claim, and (2) effective cross-lingual retrieval, where a post in one language must be matched with fact checks potentially written in different languages.
 
 Recent advances in multilingual embedding models have shown promising results for cross-lingual retrieval tasks \cite{feng2022languageagnosticbertsentenceembedding, litschko2022crosslingual}. These models learn a shared semantic space between languages, allowing for effective comparison of text regardless of the source language. In particular, contrastive learning approaches have proven effective for training such models, as they explicitly optimize for similarity between related texts while pushing unrelated texts apart in the embedding space.
@@ -78,8 +114,11 @@ Our system addresses the challenge of retrieving relevant fact checks from a lar
 
 \subsection{Model Architecture}
 
-The core of our system is built upon the \texttt{intfloat/multilingual-e5-large-instruct} model, which we improve with a custom architecture designed for fact-checking retrieval. The model consists of:
+% Acá citá el paper de E5! y describí brevemente lo que hace
 
+The core of our system is built upon the Multilingual E5 model \cite{wang2024multilingual} which we improve with a custom architecture designed for fact-checking retrieval. The model consists of:
+
+% Estaría buenísimo convertir esto en un gráfico...
 \begin{itemize}
     \item A transformer encoder (base E5 model)
     \item A mean pooling layer for sentence representation
@@ -89,8 +128,9 @@ The core of our system is built upon the \texttt{intfloat/multilingual-e5-large-
 
 The model processes both posts and fact checks using language-specific prefixes (\texttt{query:} and \texttt{passage:} respectively) to optimize the semantic matching between them.
 
-\subsection{Contrastive Learning Framework}
+\subsection{Training}
 
+% citar esta pérdida...
 We implement a contrastive learning approach using the Multiple Negatives Ranking Loss (MNRL), which can be formulated as:
 
 \begin{equation}
