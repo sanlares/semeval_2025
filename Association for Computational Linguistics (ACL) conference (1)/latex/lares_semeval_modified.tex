@@ -70,7 +70,7 @@ Our main contributions include: (1) an analysis of various model architectures a
 \section{Background}
 
 Automated fact-checking has emerged as a critical tool in combating the spread of misinformation online. \cite{zhou2020fakenews} speak about the immense volume of in-
-formation shared online, and suggest and evaluate different methods to detect fake news. The SemEval-2025 Task \cite{sebi2025multilingual} focuses especially on multilingual fact-check retrieval, where the goal is to match social media posts with relevant fact-checks from a large multilingual corpus.
+formation shared online, and suggest and evaluate different methods to detect fake news. The SemEval-2025 Task \cite{semeval2025task7} focuses especially on multilingual fact-check retrieval, where the goal is to match social media posts with relevant fact-checks from a large multilingual corpus.
 Most automated fact-checking system consist of
 three steps \cite{guo2022survey}: first, the claim de-
 tection (is this check-worthy?); then, the evidence
@@ -79,7 +79,7 @@ tion to verify it); and lastly and claim verification
 (given a claim and evidence, define if the claim
 is true or false). 
 
-The task \cite{sebi2025multilingual}  has two subtasks: monolingual retrieval and cross-lingual retrieval. We focus only on the monolingual subtask. 
+The task \cite{semeval2025task7}  has two subtasks: monolingual retrieval and cross-lingual retrieval. We focus only on the monolingual subtask. 
 
 Recent advances in multilingual embedding models have shown promising results for multi-lingual retrieval tasks \cite{feng2022languageagnosticbertsentenceembedding, litschko2022crosslingual}. These models learn a shared semantic space between languages, allowing for effective comparison of text regardless of the source language. In particular, contrastive learning approaches have proven effective for training such models \cite{chen2020simple}, as they explicitly optimize for similarity between related texts while pushing unrelated texts apart in the embedding space.
 In this paper, we present our retrieval approach to
