@@ -35,6 +35,10 @@
 %additional package(s)
 \usepackage{graphicx}
 
+% Add TikZ package for creating diagrams
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+
 % If the title and author information does not fit in the area allocated, uncomment the following
 %
 %\setlength\titlebox{<dim>}
@@ -131,7 +135,7 @@ The model processes both posts and fact checks using language-specific prefixes 
 \subsection{Training}
 
 % citar esta pérdida...
-We implement a contrastive learning approach using the Multiple Negatives Ranking Loss (MNRL), which can be formulated as:
+We trained our model using a the Multiple Negatives Ranking Loss (MNRL), which can be formulated as:
 
 \begin{equation}
 L = -\log \frac{\exp(sim(x_i, x_i^+)/\tau)}{\sum_{j=1}^{N} \exp(sim(x_i, x_j)/\tau)}
@@ -146,7 +150,7 @@ where:
     \item $sim(\cdot,\cdot)$ is the cosine similarity function
 \end{itemize}
 
-The framework employs in-batch negatives for computational efficiency while maintaining effective contrastive learning. The temperature parameter $\tau$ is dynamically adjusted during training to optimize the learning process.
+We used in-batch negatives for computational efficiency while maintaining effective contrastive learning. The temperature parameter $\tau$ is dynamically adjusted during training to optimize the learning process.
 
 \subsection{Retrieval Pipeline}
 
@@ -166,25 +170,19 @@ This pipeline is optimized for both monolingual and cross-lingual retrieval, wit
 
 \subsection{Dataset}
 
+% JM: ¿vos lo partiste o ya venía así?
+
 The dataset used for this study was derived from the official SemEval-2025 competition data. We divided the training set into training (80\%) and validation (20\%) subsets while maintaining the language distribution for both sets.
 
-For preprocessing, we utilized the \texttt{load.py} file recommended by the competition organizers. Our approach involved creating rich semantic representations for both posts and fact checks. For posts, we concatenated the OCR-extracted text (\texttt{ocr} column) with the manual transcription (\texttt{text} column) from the \texttt{posts.csv} file. Similarly, for fact checks, we combined the \texttt{claim} and \texttt{title} columns from the \texttt{fact\_checks.csv} file.
+
+For preprocessing, we used the script provided by the competition organizers.For posts, we concatenated the OCR-extracted text (\texttt{ocr} column) with the manual transcription (\texttt{text} column) from the \texttt{posts.csv} file. Similarly, for fact checks, we combined the \texttt{claim} and \texttt{title} columns from the \texttt{fact\_checks.csv} file.
 
 In addition to fine-tuning our primary model, we conducted extensive experiments with various base models available in the SentenceTransformers framework, testing different prefix combinations that yielded varying performance results.
 
 \subsection{Implementation Details}
 
-The system was implemented using the following configuration:
 
-\begin{itemize}
-    \item \textbf{Base Model}: multilingual-e5-large-instruct
-    \item \textbf{Framework}: SentenceTransformers (v3.4.1)
-    \item \textbf{Deep Learning Backend}: PyTorch (v2.5.1)
-    \item \textbf{Python Version}: 3.12.7
-    \item \textbf{Computing Environment}: macOS 15.1 (24B83)
-\end{itemize}
-
-\subsection{Training Configuration}
+We used the \textit{multilingual-e5-large-instruct} found at the Huggingface model hub \cite{wang2024multilingual} as our base model. We fine-tuned the retrieval model using the SentenceTransformers library \cite{reimers-gurevych-2019-sentence}, and used PyTorch \cite{paszke2019pytorch} to implement our models and losses.
 
 The model was trained with the following hyperparameters:
 
@@ -210,7 +208,7 @@ Mixed Precision Training & Enabled \\
 \label{tab:hyperparams}
 \end{table}
 
-\subsection{Evaluation Metrics}
+\subsection{Evaluation}
 
 The primary evaluation metric for our system was Success@10 (S@10), which measures the proportion of posts for which the correct fact check appears in the top 10 retrieved results. We evaluated the model's performance in both monolingual and cross-lingual settings:
 
@@ -233,12 +231,12 @@ We evaluate our system's performance on both the validation and test sets, analy
 
 \subsection{Official Test Results}
 
-\begin{table*}[t]
+\begin{table}[t]
   \centering
   \small
   \begin{tabular}{lcc}
     \hline
-    \textbf{Language} & \textbf{Success@10} & \textbf{Relative Performance} \\
+    \textbf{Language} & \textbf{Success@10} & \textbf{Deviation from avg.} \\
     \hline
     Malaysian (msa) & \textbf{0.978} & +12.8\% \\
     Thai (tha) & 0.940 & +8.4\% \\
@@ -256,7 +254,7 @@ We evaluate our system's performance on both the validation and test sets, analy
   \end{tabular}
   \caption{Official test set results of the fine-tuned multilingual-e5-large-instruct model by language. Languages are ordered by Success@10 score. Best performance is shown in \textbf{bold}. The model shows strong performance on Malaysian and Thai languages.}
   \label{tab:test-results-by-language}
-\end{table*}
+\end{table}
 
 \vspace{1cm}
 
@@ -323,7 +321,7 @@ We would like to thank the SemEval-2025 task organizers for creating this challe
 % Bibliography entries for the entire Anthology, followed by custom entries
 %\bibliography{anthology,custom}
 % Custom bibliography entries only
-\bibliography{custom}
+\bibliography{anthology, custom}
 
 \appendix
 

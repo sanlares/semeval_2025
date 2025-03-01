@@ -31,3 +31,4 @@ wandb/
 *.bbl
 *.out
 *.fls
+*.synctex.gz
