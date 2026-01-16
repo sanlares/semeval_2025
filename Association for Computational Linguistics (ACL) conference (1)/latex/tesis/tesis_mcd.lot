@@ -1,0 +1,18 @@
+\babel@toc {spanish}{}\relax 
+\addvspace {10pt}
+\addvspace {10pt}
+\addvspace {10pt}
+\addvspace {10pt}
+\addvspace {10pt}
+\contentsline {table}{\numberline {3.1}{\ignorespaces Ejemplo de par publicación/fact-check sobre política económica}}{3}{table.3.1}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Ejemplo de par publicación/fact-check sobre conflicto en África}}{4}{table.3.2}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Ejemplo de par publicación/fact-check sobre caso legal}}{4}{table.3.3}%
+\addvspace {10pt}
+\addvspace {10pt}
+\contentsline {table}{\numberline {5.1}{\ignorespaces Hiperparámetros de entrenamiento del modelo}}{9}{table.5.1}%
+\addvspace {10pt}
+\contentsline {table}{\numberline {6.1}{\ignorespaces Resultados del conjunto de test del modelo multilingual-e5-large-instruct fine-tuned por idioma. Los idiomas están ordenados por puntaje Success@10. El mejor rendimiento se muestra en negrita.}}{10}{table.6.1}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces Comparación de rendimiento de modelos base en el conjunto de validación. Los modelos están ordenados por puntaje Success@10. El mejor resultado se muestra en negrita.}}{11}{table.6.2}%
+\addvspace {10pt}
+\addvspace {10pt}
+\contentsline {table}{\numberline {1}{\ignorespaces Rendimiento del modelo fine-tuned con diferentes configuraciones usando un corpus reducido. Todos los experimentos fueron realizados en el conjunto de validación con un corpus conteniendo solo fact-checks en el mismo idioma que las publicaciones de consulta.}}{14}{table.Alph0.1}%

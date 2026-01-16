@@ -1,0 +1,59 @@
+\begin{thebibliography}{10}
+
+\bibitem{chambers2021truth}
+Simone Chambers.
+\newblock Truth, deliberative democracy, and the virtues of accuracy: Is fake
+  news destroying the public sphere?
+\newblock {\em Political Studies}, 69(1):147--163, 2021.
+
+\bibitem{chen2020simple}
+Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geoffrey Hinton.
+\newblock {\em A Simple Framework for Contrastive Learning of Visual
+  Representations}, volume 119 of {\em PMLR}, pages 1597--1607.
+\newblock Virtual, 13--18 Jul 2020.
+\newblock Editors: Daumé, Hal and Singh, Aarti.
+
+\bibitem{feng2022languageagnosticbertsentenceembedding}
+Fangxiaoyu Feng, Yinfei Yang, Daniel Cer, Naveen Arivazhagan, and Wei Wang.
+\newblock Language-agnostic bert sentence embedding, 2022.
+
+\bibitem{guo2022survey}
+Zhijiang Guo, Michael Schlichtkrull, and Andreas Vlachos.
+\newblock A survey on automated fact-checking.
+\newblock {\em Transactions of the Association for Computational Linguistics},
+  10:178--206, 2022.
+
+\bibitem{jadwin2023improving}
+Addison Jadwin and Catherine Huang.
+\newblock Improving minbert performance on multiple tasks through in-domain
+  pretraining, negatives ranking loss learning, and hyperparameter
+  optimization, 2023.
+
+\bibitem{lewandowsky2023misinformation}
+Stephan Lewandowsky, Ullrich~K.H. Ecker, John Cook, Sander {van der Linden},
+  Jon Roozenbeek, and Naomi Oreskes.
+\newblock Misinformation and the epistemic integrity of democracy.
+\newblock {\em Current Opinion in Psychology}, 54:101711, 2023.
+
+\bibitem{litschko2022crosslingual}
+Robert Litschko, Ivan Vulić, Simone~Paolo Ponzetto, and Goran Glavaš.
+\newblock On cross-lingual retrieval with multilingual text encoders.
+\newblock {\em Information Retrieval Journal}, 25(2):149--183, 2022.
+
+\bibitem{wang2024multilingual}
+Liang Wang, Nan Yang, Xiaolong Huang, Linjun Yang, Rangan Majumder, and Furu
+  Wei.
+\newblock Multilingual e5 text embeddings: A technical report.
+\newblock {\em arXiv preprint arXiv:2402.05672}, 2024.
+
+\bibitem{zhang2021mrtydimultilingualbenchmark}
+Xinyu Zhang, Xueguang Ma, Peng Shi, and Jimmy Lin.
+\newblock Mr. tydi: A multi-lingual benchmark for dense retrieval, 2021.
+
+\bibitem{zhou2020fakenews}
+Xinyi Zhou and Reza Zafarani.
+\newblock A survey of fake news: Fundamental theories, detection methods, and
+  opportunities.
+\newblock {\em ACM Comput. Surv.}, 53(5), September 2020.
+
+\end{thebibliography}

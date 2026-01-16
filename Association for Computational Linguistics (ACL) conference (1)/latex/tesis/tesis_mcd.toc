@@ -1,0 +1,25 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {chapter}{Resumen}{\es@scroman {i}}{chapter*.1}%
+\contentsline {chapter}{Agradecimientos}{\es@scroman {ii}}{chapter*.2}%
+\contentsline {chapter}{\'{I}ndice general}{\es@scroman {iii}}{section*.3}%
+\contentsline {chapter}{\chapternumberline {1}Introducción}{1}{chapter.1}%
+\contentsline {chapter}{\chapternumberline {2}Antecedentes}{2}{chapter.2}%
+\contentsline {chapter}{\chapternumberline {3}Ejemplos del Dataset}{3}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Ejemplo 1: Afirmación sobre desempleo}{3}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Ejemplo 2: Afirmación sobre conflicto armado}{3}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Ejemplo 3: Afirmación sobre demanda legal}{3}{section.3.3}%
+\contentsline {chapter}{\chapternumberline {4}Descripción del Sistema}{5}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Arquitectura del Modelo}{5}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Función de Pérdida}{5}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Pipeline de Retrieval}{6}{section.4.3}%
+\contentsline {chapter}{\chapternumberline {5}Configuración Experimental}{8}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Dataset}{8}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Detalles de Implementación}{8}{section.5.2}%
+\contentsline {chapter}{\chapternumberline {6}Resultados}{10}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Rendimiento por Idioma}{10}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Comparación de Modelos Base}{10}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Impacto de los Prefijos de Entrada}{11}{section.6.3}%
+\contentsline {section}{\numberline {6.4}Análisis de Reducción del Corpus}{11}{section.6.4}%
+\contentsline {chapter}{\chapternumberline {7}Conclusiones}{12}{chapter.7}%
+\contentsline {chapter}{Apéndice}{13}{appendix*.4}%
+\contentsline {chapter}{Bibliograf\'{\i }a}{14}{appendix*.5}%

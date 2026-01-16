@@ -1,0 +1,8 @@
+\babel@toc {spanish}{}
+\contentsline {chapter}{Resumen}{\es@scroman {i}}{chapter*.1}%
+\contentsline {chapter}{Agradecimientos}{\es@scroman {ii}}{chapter*.2}%
+\contentsline {chapter}{\'{I}ndice general}{\es@scroman {iii}}{section*.3}%
+\contentsline {chapter}{\chapternumberline {1}Introducción}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}ss}{1}{section.1.1}%
+\contentsline {chapter}{\chapternumberline {2}Marco teórico}{2}{chapter.2}%
+\contentsline {chapter}{Bibliograf\'{\i }a}{3}{chapter*.4}%

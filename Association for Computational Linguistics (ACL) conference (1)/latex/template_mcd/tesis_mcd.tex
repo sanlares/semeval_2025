@@ -1,0 +1,91 @@
+
+
+\documentclass[a4paper,openany]{memoir}
+%\documentclass[a4paper, british,openany]{memoir}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+
+\usepackage{style}       % Custom style
+\usepackage{udesafrontpage} % Front page
+
+%\usepackage{kantlipsum}  % Dummy text
+%\usepackage{xcolor}
+%\usepackage{multirow}
+%\usepackage{adjustbox}
+%\usepackage{graphicx}
+%\graphicspath{{./images/}}
+%\usepackage{float}
+%\usepackage{subcaption}
+%\usepackage{wrapfig}
+
+%\usepackage[export]{adjustbox}%%
+%\usepackage{amssymb,amsmath}
+
+%\newcommand{\dani}[1]{{\color{blue} #1}}
+
+%\newtheorem{definicion}{Definici\'on}[section]
+
+
+
+
+
+
+
+
+
+\title{Título}
+\subtitle{}
+\author{Nombre alumno\hfill\the\year}
+
+
+\kind{Director: nombre}
+
+
+\begin{document}
+
+    \frontmatter        % Folios in Roman numerals, unnumbered chapters.
+
+    \mnfrontpage
+
+\chapter{Resumen}
+
+
+\chapter{Agradecimientos}
+
+    \cleartorecto
+   \microtypesetup{protrusion = false}
+    \tableofcontents    % Or \tableofcontents*
+    \cleartorecto
+    \microtypesetup{protrusion = true}
+    \mainmatter         % Folios in Arabic numerals, numbered chapters.
+
+
+
+
+
+
+\chapter{Introducción}
+
+\section{ss}
+
+\chapter{Marco teórico}
+Hola~\cite{auction}.
+
+    \backmatter         % Folios in Arabic numerals, unnumbered chapters.
+
+
+
+
+\begin{thebibliography}{2}
+	\bibitem{auction} Krishna, V. 2009.   Auction theory. \textit{Academic press}.
+	
+	\bibitem{gallego} Gallego, G.,  Van Ryzin, G. 1994. Optimal dynamic pricing of inventories with stochastic demand over finite horizons. \textit{Management science}, 40(8), 999-1020.
+
+\end{thebibliography}
+
+
+
+\end{document}

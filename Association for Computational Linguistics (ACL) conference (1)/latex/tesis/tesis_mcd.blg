@@ -1,0 +1,48 @@
+This is BibTeX, Version 0.99d (TeX Live 2024)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: tesis_mcd.aux
+The style file: plain.bst
+Database file #1: custom.bib
+Warning--empty publisher in chen2020simple
+You've used 10 entries,
+            2118 wiz_defined-function locations,
+            560 strings with 6102 characters,
+and the built_in function-call counts, 3541 in all, are:
+= -- 326
+> -- 214
+< -- 2
++ -- 87
+- -- 74
+* -- 269
+:= -- 602
+add.period$ -- 28
+call.type$ -- 10
+change.case$ -- 66
+chr.to.int$ -- 0
+cite$ -- 11
+duplicate$ -- 110
+empty$ -- 249
+format.name$ -- 74
+if$ -- 716
+int.to.chr$ -- 0
+int.to.str$ -- 10
+missing$ -- 8
+newline$ -- 51
+num.names$ -- 20
+pop$ -- 75
+preamble$ -- 1
+purify$ -- 57
+quote$ -- 0
+skip$ -- 89
+stack$ -- 0
+substring$ -- 182
+swap$ -- 23
+text.length$ -- 2
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 38
+warning$ -- 1
+while$ -- 29
+width$ -- 12
+write$ -- 105
+(There was 1 warning)
