@@ -1,0 +1,311 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs among lines.
+
+\documentclass[11pt]{article}
+
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+\usepackage[final]{acl}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% Spanish language support
+\usepackage[spanish,es-noshorthands]{babel}
+
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+%Including images in your LaTeX document requires adding
+%additional package(s)
+\usepackage{graphicx}
+
+\title{Shouth NLP en SemEval-2025 Tarea 7: Retrieval Multilingüe para Fact-Checking Usando Contrastive Learning}
+\author{}
+\author{Santiago Lares Harbin and Juan Manuel Pérez \\
+  Universidad de San Andrés \\
+  \texttt{slaresharbin@udesa.edu.ar}}
+
+% Añadimos el paquete TikZ al preámbulo si no está ya incluido
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning, fit, backgrounds}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+Presentamos un sistema de retrieval multilingüe para fact-checking en la tarea de SemEval-2025, cuyo objetivo es emparejar publicaciones de redes sociales con fact-checks relevantes. Nuestro enfoque utiliza un framework de contrastive learning construido sobre la arquitectura del modelo multilingüe E5, fine-tuned con el dataset provisto. El sistema alcanza un puntaje Success@10 de 0.867 en el conjunto de test oficial, con variaciones de rendimiento entre idiomas. Demostramos que los prefixes de entrada y el filtrado del corpus por idioma mejoran significativamente el rendimiento del retrieval. Nuestro análisis revela patrones interesantes en la transferencia cross-lingual, con resultados particularmente buenos en malayo y tailandés. Hacemos público nuestro código para futuras investigaciones y desarrollos.
+\end{abstract}
+
+\section{Introducción}
+La proliferación de desinformación en redes sociales es referida por científicos sociales como una amenaza a la integridad de la democracia y la esfera pública \cite{chambers2021truth, lewandowsky2023misinformation}.
+Este escenario ha generado una necesidad urgente de sistemas automatizados de fact-checking capaces de recuperar fact-checks relevantes para claims dudosos. La Tarea de SemEval-2025 \cite{sebi2025multilingual} aborda este desafío requiriendo que los participantes desarrollen sistemas que puedan recuperar los fact-checks más relevantes para publicaciones de redes sociales de un corpus extenso de 272,447 fact-checks en múltiples idiomas.
+
+En este trabajo, presentamos nuestro enfoque para esta tarea, que utiliza un modelo de embeddings multilingüe fine-tuned basado en la arquitectura E5 \cite{wang2024multilingual}. Nuestro sistema emplea un framework de contrastive learning para optimizar el matching semántico entre publicaciones y fact-checks durante el fine-tuning. Nos enfocamos particularmente en el aprendizaje de representaciones multilingües y las funciones de retrieval cross-lingual. El código de nuestro sistema está disponible públicamente en GitHub\footnote{\url{https://github.com/sanlares/semeval_2025}}.
+
+Nuestras principales contribuciones incluyen: (1) un análisis de varias arquitecturas de modelos y su rendimiento entre diferentes idiomas, (2) un examen de cómo los prefixes de entrada afectan la precisión del retrieval, y (3) una demostración de la importancia del filtrado del corpus por idioma para mejorar el rendimiento del retrieval. Nuestro sistema alcanzó un puntaje promedio Success@10 de 0.867 en el conjunto de test oficial, ubicándose en el puesto 20 de 28 participantes publicados.
+
+\section{Antecedentes}
+
+El fact-checking automatizado ha emergido como una herramienta crítica en el combate contra la propagación de desinformación en línea. \cite{zhou2020fakenews} hablan sobre el inmenso volumen de información compartida en línea, y sugieren y evalúan diferentes métodos para detectar noticias falsas. La Tarea de SemEval-2025 \cite{semeval2025task7} se enfoca especialmente en el retrieval de fact-checks multilingüe, donde el objetivo es emparejar publicaciones de redes sociales con fact-checks relevantes de un extenso corpus multilingüe.
+La mayoría de los sistemas automatizados de fact-checking consisten en
+tres pasos \cite{guo2022survey}: primero, la detección del claim (¿es esto verificable?); luego, el retrieval de evidencia (dado un claim, recuperar información relevante para verificarlo); y por último, la verificación del claim (dado un claim y evidencia, definir si el claim es verdadero o falso).
+
+La tarea \cite{semeval2025task7} tiene dos subtareas: retrieval monolingüe y retrieval cross-lingual. Nosotros nos enfocamos únicamente en la subtarea monolingüe.
+
+Los avances recientes en modelos de embeddings multilingües han mostrado resultados prometedores para tareas de retrieval multilingüe \cite{feng2022languageagnosticbertsentenceembedding, litschko2022crosslingual}. Estos modelos aprenden un espacio semántico compartido entre idiomas, permitiendo la comparación efectiva de texto independientemente del idioma de origen. En particular, los enfoques de contrastive learning han demostrado ser efectivos para entrenar tales modelos \cite{chen2020simple}, ya que optimizan explícitamente la similitud entre textos relacionados mientras alejan los textos no relacionados en el espacio de embeddings.
+En este trabajo, presentamos nuestro enfoque de retrieval para esta tarea, que usa un modelo de embeddings multilingüe fine-tuned basado en la arquitectura E5 \cite{wang2024multilingual}. Este modelo ha demostrado un rendimiento sólido en benchmarks de retrieval multilingüe \cite{zhang2021mrtydimultilingualbenchmark} al combinar encoders basados en transformer con pre-training contrastivo. Adicionalmente, hacemos fine-tuning de este modelo con los datos específicos de la tarea para mejorar su rendimiento en el retrieval de fact-checks.
+
+\section{Descripción del Sistema}
+
+Nuestro sistema aborda el desafío de recuperar fact-checks relevantes de un extenso corpus de 272,447 documentos implementando un enfoque de contrastive learning fine-tuned basado en la arquitectura del modelo multilingüe E5. El sistema consiste en tres componentes principales: (1) un modelo de embeddings de texto, (2) un framework de contrastive learning, y (3) un pipeline de retrieval.
+
+El núcleo de nuestro sistema está construido sobre el \texttt{Modelo Multilingüe E5} \cite{wang2024multilingual}, que mejoramos con una arquitectura personalizada. La arquitectura del modelo se ilustra en la Figura~\ref{fig:model-architecture}, consistiendo en un encoder transformer, una capa de mean pooling, una capa de proyección densa con activación GELU, y normalización L2 para el cálculo de similitud coseno.
+
+% Diagrama de la arquitectura del modelo
+\begin{figure}[h]
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.8cm,
+        box/.style={rectangle, draw, fill=blue!10, rounded corners, minimum height=0.8cm, minimum width=3.5cm, align=center, font=\small},
+        arrow/.style={thick,->,>=stealth, shorten >=2pt, shorten <=2pt}
+    ]
+
+    % Nodos para la entrada
+    \node[box] (input) {Texto de Entrada\\(Publicación/Fact-Check)};
+
+    % Componentes del modelo
+    \node[box, below=of input] (transformer) {Encoder Transformer\\(modelo base E5) \cite{wang2024multilingual}};
+    \node[box, below=of transformer] (pooling) {Capa de Mean Pooling\\(Representación de Oración)};
+    \node[box, below=of pooling] (dense) {Capa de Proyección Densa\\(Activación GELU)};
+    \node[box, below=of dense] (norm) {Normalización L2 \cite{reimers2019sentence}};
+    \node[box, below=of norm] (output) {Vector de Embedding\\(para Cálculo de Similitud)};
+
+    % Flechas conectando los componentes
+    \draw[arrow] (input) -- (transformer);
+    \draw[arrow] (transformer) -- (pooling);
+    \draw[arrow] (pooling) -- (dense);
+    \draw[arrow] (dense) -- (norm);
+    \draw[arrow] (norm) -- (output);
+
+    \end{tikzpicture}
+    \caption{Arquitectura del modelo de embeddings usado en nuestro sistema. El modelo procesa tanto publicaciones como fact-checks usando prefixes específicos por idioma para optimizar el matching semántico.}
+    \label{fig:model-architecture}
+\end{figure}
+
+El modelo procesa tanto publicaciones como fact-checks usando prefixes específicos por idioma (\texttt{query:} y \texttt{passage:} respectivamente) para optimizar el matching semántico entre ellos.
+
+Entrenamos nuestro modelo usando la Multiple Negatives Ranking Loss (MNRL) \cite{jadwin2023improving}, que puede formularse como:
+
+\begin{equation}
+L = -\log \frac{\exp(sim(x_i, x_i^+)/\tau)}{\sum_{j=1}^{N} \exp(sim(x_i, x_j)/\tau)}
+\end{equation}
+
+donde:
+\begin{itemize}
+    \item $x_i$ representa el embedding del texto ancla (publicación)
+    \item $x_i^+$ representa el embedding del par positivo (fact-check correspondiente)
+    \item $x_j$ representa todas las otras muestras en el batch (pares negativos)
+    \item $\tau$ es un parámetro de temperatura que controla la nitidez de la distribución
+    \item $sim(\cdot,\cdot)$ es la función de similitud coseno
+\end{itemize}
+
+Usamos negativos in-batch para eficiencia computacional mientras mantenemos un contrastive learning efectivo. El parámetro de temperatura $\tau$ se ajusta dinámicamente durante el entrenamiento para optimizar el proceso de aprendizaje.
+
+El proceso de retrieval sigue estos pasos:
+\begin{enumerate}
+    \item \textbf{Detección de Idioma}: El sistema primero identifica el idioma de la publicación de entrada.
+    \item \textbf{Filtrado del Corpus}: El corpus de fact-checks se filtra para priorizar documentos en el mismo idioma que la publicación de entrada.
+    \item \textbf{Generación de Embeddings}: El modelo genera embeddings tanto para la publicación de entrada como para los fact-checks filtrados.
+    \item \textbf{Ranking por Similitud}: El sistema computa la similitud coseno de Pearson entre los embeddings de la publicación y los fact-checks.
+    \item \textbf{Selección Top-K}: Se recuperan y ordenan los 10 fact-checks más similares.
+\end{enumerate}
+
+Este pipeline está configurado tanto para retrieval monolingüe como cross-lingual, con consideración especial para las distinciones específicas por idioma en el espacio de embeddings.
+
+\section{Configuración Experimental}
+
+\subsection{Dataset}
+
+El dataset utilizado para este estudio fue derivado de los datos oficiales de la competencia SemEval-2025. Dividimos el conjunto de entrenamiento en subconjuntos de entrenamiento (80\%) y validación (20\%) mientras manteníamos la distribución de idiomas para ambos conjuntos.
+
+Para el preprocesamiento, utilizamos el archivo \texttt{load.py} recomendado por los organizadores de la competencia. Nuestro enfoque involucró la creación de representaciones semánticas tanto para publicaciones como para fact-checks. Para las publicaciones, concatenamos el texto extraído por OCR (columna \texttt{ocr}) con la transcripción manual (columna \texttt{text}) del archivo \texttt{posts.csv}. De manera similar, para los fact-checks, combinamos las columnas \texttt{claim} y \texttt{title} del archivo \texttt{fact\_checks.csv}. Para la entrada del modelo, se antepusieron prefixes relevantes (por ejemplo, \texttt{query:}, \texttt{passage:}) a estos textos concatenados antes de la tokenización para guiar la comprensión contextual del modelo.
+
+Además de hacer fine-tuning de nuestro modelo principal, realizamos experimentos con varios modelos base disponibles en el framework SentenceTransformers, probando diferentes combinaciones de prefixes que arrojaron resultados de rendimiento variados.
+
+\subsection{Detalles de Implementación}
+
+El sistema fue implementado usando la siguiente configuración:
+
+\begin{itemize}
+    \item \textbf{Modelo Base}: multilingual-e5-large-instruct
+    \item \textbf{Framework}: SentenceTransformers (v3.4.1)
+    \item \textbf{Backend de Deep Learning}: PyTorch (v2.5.1)
+    \item \textbf{Versión de Python}: 3.12.7
+    \item \textbf{Entorno de Cómputo}: macOS 15.1 (24B83)
+\end{itemize}
+
+El modelo fue entrenado con los siguientes hiperparámetros:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{ll}
+\hline
+\textbf{Parámetro} & \textbf{Valor} \\
+\hline
+Longitud Máxima de Secuencia & 512 tokens \\
+Modo de Pooling & Mean \\
+Dimensión de Embedding & 384 \\
+Tamaño de Batch & 4 \\
+Tamaño de Batch de Evaluación & 16 \\
+Pasos de Acumulación de Gradiente & 2 \\
+Learning Rate & 2e-5 \\
+Temperatura & 0.05 \\
+Entrenamiento con Precisión Mixta & Habilitado \\
+\hline
+\end{tabular}
+\caption{Hiperparámetros de entrenamiento del modelo}
+\label{tab:hyperparams}
+\end{table}
+
+La métrica principal de evaluación para nuestro sistema fue Success@10 (S@10), que mide la proporción de publicaciones para las cuales el fact-check correcto aparece en los 10 resultados principales recuperados. Evaluamos el rendimiento del modelo en configuraciones tanto monolingües como cross-lingual:
+
+\section{Resultados}
+
+Evaluamos el rendimiento de nuestro sistema en los conjuntos de validación y test, analizando el impacto de diferentes configuraciones del modelo y el rendimiento específico por idioma. Nuestro sistema alcanzó un puntaje promedio Success@10 de \textbf{0.867} en el conjunto de test oficial, ubicándose en el puesto 20 de 28 participantes publicados.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{lcc}
+    \hline
+    \textbf{Idioma} & \textbf{Success@10} & \textbf{Rendimiento Relativo} \\
+    \hline
+    Malayo (msa) & \textbf{0.978} & +12.8\% \\
+    Tailandés (tha) & 0.940 & +8.4\% \\
+    Árabe (ara) & 0.912 & +5.2\% \\
+    Francés (fra) & 0.894 & +3.1\% \\
+    Español (spa) & 0.866 & -0.1\% \\
+    Alemán (deu) & 0.858 & -1.0\% \\
+    Turco (tur) & 0.828 & -4.5\% \\
+    Polaco (pol) & 0.806 & -7.0\% \\
+    Inglés (eng) & 0.796 & -8.2\% \\
+    Portugués (por) & 0.796 & -8.2\% \\
+    \hline
+    \textbf{Promedio} & 0.867 & -- \\
+    \hline
+  \end{tabular}
+  \caption{Resultados oficiales del conjunto de test del modelo multilingual-e5-large-instruct fine-tuned por idioma. Los idiomas están ordenados por puntaje Success@10. El mejor rendimiento se muestra en \textbf{negrita}. El modelo muestra un rendimiento sólido en malayo y tailandés.}
+  \label{tab:test-results-by-language}
+\end{table*}
+
+Los resultados demuestran una variabilidad considerable en el rendimiento del modelo entre idiomas, con malayo (msa) mostrando el mejor rendimiento con 0.978 e inglés (eng) y portugués (por) mostrando el más bajo con 0.796. Esta disparidad sugiere que factores lingüísticos pueden jugar un rol significativo en el rendimiento del retrieval.
+
+La Tabla~\ref{tab:base-models} muestra la comparación de rendimiento de diferentes modelos base y configuraciones de prefixes de entrada en el conjunto de validación. Los resultados demuestran que el modelo multilingual-e5-large-instruct con los prefixes apropiados supera consistentemente a otras configuraciones.
+El modelo base $intfloat/multilingual-e5-large-
+instruct$ \cite{wang2024multilingual} mejoró de un
+Success@10 promedio de 0.834 a 0.867 cuando se le hizo
+fine-tuning con el dataset de entrenamiento, junto con los
+prefixes recomendados de query y passage. Esta mejora
+fue consistente para todos los idiomas testeados
+en la competencia.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{p{5cm}p{3cm}p{3cm}c}
+    \hline
+    \textbf{Modelo Base} & \textbf{Prefix de Posts} & \textbf{Prefix de Facts} & \textbf{Success@10} \\
+    \hline
+    \texttt{multilingual-e5-large-instruct} \cite{wang2024multilingual} & passage: & query: & \textbf{0.834} \\
+    \texttt{multilingual-e5-large-instruct} \cite{wang2024multilingual} & -- & -- & 0.821 \\
+    \texttt{multilingual-e5-small} \cite{wang2024multilingual} & -- & -- & 0.795 \\
+    \texttt{e5-large-v2} \cite{wang2022text} & -- & -- & 0.758 \\
+    \texttt{modernbert-embed-base} \cite{nussbaum2024nomic} & \texttt{search\_query:} & \texttt{search\_document:} & 0.779 \\
+    \texttt{paraphrase-multilingual-mpnet-base-v2} \cite{reimers2019sentence} & -- & -- & 0.736 \\
+    \hline
+  \end{tabular}
+  \caption{Comparación de rendimiento de modelos base en el conjunto de validación. Los modelos están ordenados por puntaje Success@10. El mejor resultado se muestra en \textbf{negrita}.}
+  \label{tab:base-models}
+\end{table*}
+
+\subsection{Impacto de los Prefixes de Entrada}
+
+Nuestros experimentos revelaron que la elección de prefixes de entrada impacta significativamente el rendimiento del modelo. Usar los prefixes recomendados en el modelo base multilingual-e5-large-instruct ('passage:' y 'query:') mejoró el puntaje promedio Success@10 en 0.013 puntos (de 0.821 a 0.834) comparado con no usar prefixes. Esta mejora fue consistente en todos los idiomas, con las mayores ganancias observadas en:
+
+\begin{itemize}
+    \item Inglés: +0.022 (de 0.766 a 0.788)
+    \item Español: +0.012 (de 0.857 a 0.869)
+    \item Portugués: +0.018 (de 0.781 a 0.799)
+\end{itemize}
+
+Estos resultados sugieren que el formateo apropiado de la entrada juega un rol vital en mejorar la comprensión cross-lingual del modelo y las funciones de retrieval.
+
+\subsection{Análisis de Reducción del Corpus}
+Nuestros experimentos mostraron que el rendimiento mejora significativamente cuando el corpus de fact-checks se reduce en tamaño. Específicamente, cuando se usa solo el subconjunto de aproximadamente 16,000 fact-checks correspondientes al conjunto de validación (versus el corpus completo de 272,447), los puntajes de Success@10 mejoraron en un promedio de 10.2\%. Esta mejora demuestra el impacto del tamaño del corpus en la precisión del retrieval. Para experimentos más detallados sobre reducción del corpus con el modelo fine-tuned, ver la Tabla~\ref{tab:prefix-experiments} en el Apéndice~\ref{sec:appendix-results}.
+
+Nuestro análisis reveló varios resultados clave:
+
+\begin{itemize}
+    \item El modelo base multilingual-e5-large-instruct supera consistentemente a otras opciones.
+    \item La arquitectura de entrenamiento del modelo implementada es adecuada para el entrenamiento con el dataset provisto, permitiendo obtener un modelo fine-tuned que supera al mejor modelo base testeado en los experimentos.
+    \item Los prefixes de entrada apropiados pueden proporcionar ganancias de rendimiento sustanciales, mejorando Success@10 en 0.013 puntos en promedio.
+    \item Existe una variabilidad considerable en el rendimiento del modelo entre idiomas, sugiriendo que el tuning específico por idioma podría generar mejoras adicionales.
+    \item La reducción del corpus por idioma mejora dramáticamente la precisión del retrieval, destacando la importancia de estrategias efectivas de pre-filtrado.
+\end{itemize}
+
+El trabajo subsiguiente podría enfocarse en abordar la discrepancia de rendimiento entre idiomas, quizás a través de fine-tuning específico por idioma o técnicas más sofisticadas de transferencia cross-lingual. Además, explorar métodos de ensemble que combinen múltiples modelos de embeddings podría mejorar la precisión del retrieval para idiomas desafiantes.
+
+\section{Agradecimientos}
+
+Queremos agradecer a los organizadores de la tarea SemEval-2025 por crear esta tarea desafiante e impactante, y por proporcionar métricas de evaluación y datasets exhaustivos.
+
+% Bibliography entries for the entire Anthology, followed by custom entries
+%\bibliography{anthology,custom}
+% Custom bibliography entries only
+\bibliography{custom}
+
+\appendix
+
+\section{Análisis de Reducción del Corpus}
+\label{sec:appendix-results}
+
+La Tabla~\ref{tab:prefix-experiments} muestra el impacto de la reducción del corpus en el rendimiento del modelo fine-tuned. Los resultados demuestran que usar subconjuntos específicos por idioma del corpus de fact-checks mejora significativamente el rendimiento del retrieval.
+
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{p{1.6cm}p{1.8cm}p{1.8cm}c}
+    \hline
+    \textbf{Modelo} & \textbf{Prefix de Posts} & \textbf{Prefix de Facts} & \textbf{S@10} \\
+    \hline
+    multi-e5 & query: & passage: & \textbf{0.934} \\
+    multi-e5 & -- & -- & 0.933 \\
+    multi-e5 & post: & fact check: & 0.934 \\
+    multi-e5 & This is a post... & This is a fact... & 0.936 \\
+    multi-e5 & <[language]> & -- & 0.933 \\
+    multi-e5 & The following... & The following... & 0.934 \\
+    \hline
+  \end{tabular}
+  \caption{Rendimiento del modelo fine-tuned con diferentes configuraciones usando un corpus reducido. Todos los experimentos fueron realizados en el conjunto de validación con un corpus conteniendo solo fact-checks en el mismo idioma que las publicaciones de consulta, resultando en puntajes generales más altos comparados con la evaluación del corpus completo.}
+  \label{tab:prefix-experiments}
+\end{table}
+
+Nuestros experimentos mostraron que el rendimiento mejora significativamente cuando el corpus de fact-checks se reduce para incluir solo documentos en el mismo idioma que la publicación de consulta. Por ejemplo, cuando se recupera de un subconjunto específico por idioma de aproximadamente 16,000 fact-checks (versus el corpus completo de 272,447), los puntajes de Success@10 mejoraron en un promedio de 10.2\%.
+
+\end{document}
